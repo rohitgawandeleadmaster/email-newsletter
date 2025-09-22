@@ -5,6 +5,13 @@ import { MousePointer, Eye, Save, Send, Download, Share2 } from "lucide-react";
 import domToImage from "dom-to-image-more";
 import jsPDF from "jspdf";
 
+// Add LZ-String compression library dynamically
+if (typeof window !== 'undefined' && !window.LZString) {
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js';
+  script.async = true;
+  document.head.appendChild(script);
+}
 // Add your Cloudinary details here
 const CLOUD_NAME = "dhlex64es";
 const UPLOAD_PRESET = "newsletter";
