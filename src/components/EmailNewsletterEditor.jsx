@@ -213,64 +213,32 @@ export default function EmailNewsletterEditor() {
   const [message, setMessage] = useState("");
   const [shareDisabled, setShareDisabled] = useState(false);
   const [isSharedDataLoaded, setIsSharedDataLoaded] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [templateUrl, setTemplateUrl] = useState('');
 
   const dragItem = useRef(null);
   const canvasRef = useRef(null);
 
-  // Updated useEffect to handle all URL parameter types
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+  // Check for encoded data in the URL on initial load
+ useEffect(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const templateUrl = urlParams.get("template");
 
-    // Check for compressed data
-    const compressedData = urlParams.get('c');
-    if (compressedData) {
-      const parsedData = decompressData(compressedData);
-      if (parsedData) {
-        setElements(parsedData.elements);
-        setGlobalSettings(parsedData.globalSettings);
-        setNewsletterName(parsedData.name || 'Untitled Newsletter');
+  if (templateUrl) {
+    fetch(templateUrl)
+      .then((res) => res.json())
+      .then((data) => {
+        setElements(data.elements);
+        setGlobalSettings(data.globalSettings);
+        setNewsletterName(data.name || "Untitled Newsletter");
         setShareDisabled(true);
         setIsSharedDataLoaded(true);
-        showMessage("Loaded from compressed link!");
-        return;
-      }
-    }
-
-    // Check for regular base64 encoded data
-    const encodedData = urlParams.get('data');
-    if (encodedData) {
-      try {
-        const decoded = decodeURIComponent(atob(encodedData));
-        const parsedData = JSON.parse(decoded);
-
-        setElements(parsedData.elements);
-        setGlobalSettings(parsedData.globalSettings);
-        setNewsletterName(parsedData.name || 'Untitled Newsletter');
-        setShareDisabled(true);
-        setIsSharedDataLoaded(true);
-        showMessage("Loaded from shared link!");
-        return;
-      } catch (e) {
-        console.error('Error decoding shared link:', e);
-      }
-    }
-
-    // Check for paste service data
-    const pasteUrl = urlParams.get('paste');
-    if (pasteUrl) {
-      loadFromPasteService(decodeURIComponent(pasteUrl));
-      return;
-    }
-
-    // Check for GitHub Gist data
-    const gistId = urlParams.get('gist');
-    if (gistId) {
-      loadFromGist(gistId);
-      return;
-    }
-  }, []);
+        showMessage("Loaded from shared template!");
+      })
+      .catch((err) => {
+        console.error("Error loading shared template:", err);
+        showMessage("Failed to load shared template.");
+      });
+  }
+}, []);
 
   const showMessage = (text) => {
     setMessage(text);
@@ -450,6 +418,33 @@ export default function EmailNewsletterEditor() {
     updateElement(id, { styles: styleUpdates });
   };
 
+
+  const saveToCloudinary = async (data) => {
+  try {
+    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+    const formData = new FormData();
+    formData.append("file", blob);
+    formData.append("upload_preset", UPLOAD_PRESET);
+    formData.append("public_id", `newsletter_${Date.now()}`); // unique file name
+    formData.append("resource_type", "raw");
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const uploaded = await res.json();
+    if (uploaded.secure_url) {
+      return uploaded.secure_url; // URL of JSON file
+    } else {
+      throw new Error("Upload failed");
+    }
+  } catch (err) {
+    console.error("Cloudinary save error:", err);
+    throw err;
+  }
+};
+
   const handleImageUpload = async (id, file) => {
     if (!file || !file.type.startsWith("image")) return;
 
@@ -543,42 +538,7 @@ export default function EmailNewsletterEditor() {
     setTimeout(() => setShowSaveAlert(false), 2000);
   };
 
-  // Add these functions to your component, replacing the existing copyShareLink function
-// Function to compress data using LZ-String
-const compressData = (data) => {
-  // Wait for LZ-String to load if it hasn't already
-  return new Promise((resolve) => {
-    const checkLZString = () => {
-      if (window.LZString) {
-        try {
-          const compressed = window.LZString.compressToEncodedURIComponent(JSON.stringify(data));
-          resolve(compressed);
-        } catch (error) {
-          console.error('Compression failed:', error);
-          resolve(null);
-        }
-      } else {
-        setTimeout(checkLZString, 100);
-      }
-    };
-    checkLZString();
-  });
-};
-
-// Function to decompress data
-const decompressData = (compressed) => {
-  try {
-    if (!window.LZString) return null;
-    const decompressed = window.LZString.decompressFromEncodedURIComponent(compressed);
-    return decompressed ? JSON.parse(decompressed) : null;
-  } catch (error) {
-    console.error('Decompression failed:', error);
-    return null;
-  }
-};
-
-// Updated copyShareLink function with compression and fallback
-const copyShareLink = async () => {
+  const copyShareLink = async () => {
   try {
     const dataToShare = {
       name: newsletterName,
@@ -586,204 +546,18 @@ const copyShareLink = async () => {
       globalSettings,
     };
 
-    // Try compression first
-    const compressed = await compressData(dataToShare);
-    if (compressed) {
-      const compressedUrl = `${window.location.origin}${window.location.pathname}?c=${compressed}`;
+    // Upload JSON to Cloudinary
+    const urlOnCloudinary = await saveToCloudinary(dataToShare);
 
-      // Check if compressed URL is still too long (fallback to storage service)
-      if (compressedUrl.length > 2000) {
-        await createShareViaStorage(dataToShare);
-        return;
-      }
-
-      await navigator.clipboard.writeText(compressedUrl);
-      showMessage("Compressed share link copied to clipboard!");
-      return;
-    }
-
-    // If compression fails, try base64 encoding
-    const json = JSON.stringify(dataToShare);
-    const encoded = btoa(encodeURIComponent(json));
-    const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
-
-    if (url.length > 2000) {
-      await createShareViaStorage(dataToShare);
-      return;
-    }
+    // Create a share link with template param
+    const url = `${window.location.origin}${window.location.pathname}?template=${encodeURIComponent(urlOnCloudinary)}`;
 
     await navigator.clipboard.writeText(url);
     showMessage("Share link copied to clipboard!");
-  } catch (error) {
-    console.error('Share link creation failed:', error);
+  } catch {
     showMessage("Error creating share link.");
   }
 };
-
-// Alternative: Use a storage service for large data
-const createShareViaStorage = async (data) => {
-  try {
-    // Option 1: Use a simple paste service (like dpaste.com)
-    const response = await fetch('https://dpaste.com/api/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        content: JSON.stringify(data),
-        syntax: 'json',
-        expiry_days: 30
-      })
-    });
-
-    if (response.ok) {
-      const pasteUrl = response.url;
-      const shareUrl = `${window.location.origin}${window.location.pathname}?paste=${encodeURIComponent(pasteUrl)}`;
-      await navigator.clipboard.writeText(shareUrl);
-      showMessage("Share link created via storage service!");
-      return;
-    }
-
-    // Option 2: Use GitHub Gist as storage (requires no API key for public gists)
-    const gistResponse = await fetch('https://api.github.com/gists', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        files: {
-          'newsletter-data.json': {
-            content: JSON.stringify(data, null, 2)
-          }
-        },
-        public: false,
-        description: `Newsletter: ${data.name || 'Untitled'}`
-      })
-    });
-
-    if (gistResponse.ok) {
-      const gistData = await gistResponse.json();
-      const gistId = gistData.id;
-      const shareUrl = `${window.location.origin}${window.location.pathname}?gist=${gistId}`;
-      await navigator.clipboard.writeText(shareUrl);
-      showMessage("Share link created via GitHub Gist!");
-      return;
-    }
-
-    throw new Error('All storage methods failed');
-  } catch (error) {
-    console.error('Storage service failed:', error);
-    showMessage("Newsletter is too large to share directly. Consider reducing content size.");
-  }
-};
-
-// Function to load data from paste service
-const loadFromPasteService = async (pasteUrl) => {
-  try {
-    const response = await fetch(pasteUrl + '.txt'); // Most paste services provide .txt endpoint
-    const jsonData = await response.text();
-    const parsedData = JSON.parse(jsonData);
-
-    setElements(parsedData.elements);
-    setGlobalSettings(parsedData.globalSettings);
-    setNewsletterName(parsedData.name || 'Untitled Newsletter');
-    setShareDisabled(true);
-    setIsSharedDataLoaded(true);
-    showMessage("Loaded from paste service!");
-  } catch (error) {
-    console.error('Error loading from paste service:', error);
-    showMessage("Failed to load shared newsletter data.");
-  }
-};
-
-// Function to load data from GitHub Gist
-const loadFromGist = async (gistId) => {
-  try {
-    const response = await fetch(`https://api.github.com/gists/${gistId}`);
-    const gistData = await response.json();
-    const fileContent = Object.values(gistData.files)[0].content;
-    const parsedData = JSON.parse(fileContent);
-
-    setElements(parsedData.elements);
-    setGlobalSettings(parsedData.globalSettings);
-    setNewsletterName(parsedData.name || 'Untitled Newsletter');
-    setShareDisabled(true);
-    setIsSharedDataLoaded(true);
-    showMessage("Loaded from GitHub Gist!");
-  } catch (error) {
-    console.error('Error loading from gist:', error);
-    showMessage("Failed to load shared newsletter data.");
-  }
-
-
-  // Template saving and loading functions for Cloudinary
-  const saveTemplateToCloudinary = async () => {
-    setIsSaving(true);
-    setMessage('Saving template...');
-
-    try {
-      const templateData = {
-        newsletterName,
-        globalSettings,
-        elements,
-      };
-
-      // Convert the data to a JSON string and create a Blob
-      const jsonString = JSON.stringify(templateData);
-      const jsonBlob = new Blob([jsonString], { type: 'application/json' });
-
-      const formData = new FormData();
-      formData.append('file', jsonBlob, 'newsletter-template.json');
-      formData.append('upload_preset', UPLOAD_PRESET);
-      formData.append('folder', 'newsletter-templates'); // Optional: store in a separate folder
-
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      const result = await response.json();
-
-      if (response.ok) {
-        setTemplateUrl(result.secure_url);
-        setMessage('Template saved successfully!');
-        // Copy the URL to the clipboard for easy sharing
-        navigator.clipboard.writeText(result.secure_url);
-      } else {
-        throw new Error(result.error.message);
-      }
-    } catch (error) {
-      console.error('Template save error:', error);
-      setMessage(`Failed to save template: ${error.message}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const loadTemplateFromCloudinary = async (url) => {
-    setMessage('Loading template...');
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      const templateData = await response.json();
-
-      // Update the component's state with the loaded data
-      setNewsletterName(templateData.newsletterName);
-      setGlobalSettings(templateData.globalSettings);
-      setElements(templateData.elements);
-
-      setMessage('Template loaded successfully!');
-
-    } catch (error) {
-      console.error('Template load error:', error);
-      setMessage(`Failed to load template: ${error.message}`);
-    }
-  };};
 
   const prepareForExport = () => {
     exportLinkRects = [];
@@ -1470,38 +1244,7 @@ const loadFromGist = async (gistId) => {
             >
               <Eye className="w-4 h-4" />
               Preview
-
-
-          {/* New: Template Save and Load Controls */}
-          <div className="flex items-center gap-3 ml-6">
-            <button
-              onClick={saveTemplateToCloudinary}
-              disabled={isSaving}
-              className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 ${
-                isSaving
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  : "bg-blue-500 text-white hover:bg-blue-600"
-              }`}
-            >
-              <Save className="w-4 h-4" />
-              {isSaving ? "Saving..." : "Save Template"}
             </button>
-            <div className="relative">
-              <input
-                type="text"
-                value={templateUrl}
-                onChange={(e) => setTemplateUrl(e.target.value)}
-                placeholder="Paste template URL to load..."
-                className="border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                onClick={() => loadTemplateFromCloudinary(templateUrl)}
-                className="absolute right-0 top-0 h-full px-3 text-blue-500 hover:text-blue-700"
-              >
-                Load
-              </button>
-            </div>
-          </div>            </button>
           </div>
 
           {/* Export & Share Actions */}
@@ -1601,6 +1344,5 @@ const loadFromGist = async (gistId) => {
         />
       </div>
     </div>
-    
   );
 }
