@@ -217,11 +217,27 @@ export default function EmailNewsletterEditor() {
   const dragItem = useRef(null);
   const canvasRef = useRef(null);
 
-  // Check for encoded data in the URL on initial load
+  // Updated useEffect to handle all URL parameter types
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const encodedData = urlParams.get("data");
 
+    // Check for compressed data
+    const compressedData = urlParams.get('c');
+    if (compressedData) {
+      const parsedData = decompressData(compressedData);
+      if (parsedData) {
+        setElements(parsedData.elements);
+        setGlobalSettings(parsedData.globalSettings);
+        setNewsletterName(parsedData.name || 'Untitled Newsletter');
+        setShareDisabled(true);
+        setIsSharedDataLoaded(true);
+        showMessage("Loaded from compressed link!");
+        return;
+      }
+    }
+
+    // Check for regular base64 encoded data
+    const encodedData = urlParams.get('data');
     if (encodedData) {
       try {
         const decoded = decodeURIComponent(atob(encodedData));
@@ -229,14 +245,28 @@ export default function EmailNewsletterEditor() {
 
         setElements(parsedData.elements);
         setGlobalSettings(parsedData.globalSettings);
-        setNewsletterName(parsedData.name || "Untitled Newsletter");
+        setNewsletterName(parsedData.name || 'Untitled Newsletter');
         setShareDisabled(true);
         setIsSharedDataLoaded(true);
-        showMessage("Loaded from a shared link!");
+        showMessage("Loaded from shared link!");
+        return;
       } catch (e) {
-        console.error("Error decoding shared link:", e);
-        showMessage("Invalid shared link.");
+        console.error('Error decoding shared link:', e);
       }
+    }
+
+    // Check for paste service data
+    const pasteUrl = urlParams.get('paste');
+    if (pasteUrl) {
+      loadFromPasteService(decodeURIComponent(pasteUrl));
+      return;
+    }
+
+    // Check for GitHub Gist data
+    const gistId = urlParams.get('gist');
+    if (gistId) {
+      loadFromGist(gistId);
+      return;
     }
   }, []);
 
@@ -511,23 +541,178 @@ export default function EmailNewsletterEditor() {
     setTimeout(() => setShowSaveAlert(false), 2000);
   };
 
-  const copyShareLink = () => {
-    try {
-      const dataToShare = {
-        name: newsletterName,
-        elements,
-        globalSettings,
-      };
-      const json = JSON.stringify(dataToShare);
-      const encoded = btoa(encodeURIComponent(json));
-      const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
+  // Add these functions to your component, replacing the existing copyShareLink function
+// Function to compress data using LZ-String
+const compressData = (data) => {
+  // Wait for LZ-String to load if it hasn't already
+  return new Promise((resolve) => {
+    const checkLZString = () => {
+      if (window.LZString) {
+        try {
+          const compressed = window.LZString.compressToEncodedURIComponent(JSON.stringify(data));
+          resolve(compressed);
+        } catch (error) {
+          console.error('Compression failed:', error);
+          resolve(null);
+        }
+      } else {
+        setTimeout(checkLZString, 100);
+      }
+    };
+    checkLZString();
+  });
+};
 
-      navigator.clipboard.writeText(url);
-      showMessage("Share link copied to clipboard!");
-    } catch {
-      showMessage("Error creating share link.");
+// Function to decompress data
+const decompressData = (compressed) => {
+  try {
+    if (!window.LZString) return null;
+    const decompressed = window.LZString.decompressFromEncodedURIComponent(compressed);
+    return decompressed ? JSON.parse(decompressed) : null;
+  } catch (error) {
+    console.error('Decompression failed:', error);
+    return null;
+  }
+};
+
+// Updated copyShareLink function with compression and fallback
+const copyShareLink = async () => {
+  try {
+    const dataToShare = {
+      name: newsletterName,
+      elements,
+      globalSettings,
+    };
+
+    // Try compression first
+    const compressed = await compressData(dataToShare);
+    if (compressed) {
+      const compressedUrl = `${window.location.origin}${window.location.pathname}?c=${compressed}`;
+
+      // Check if compressed URL is still too long (fallback to storage service)
+      if (compressedUrl.length > 2000) {
+        await createShareViaStorage(dataToShare);
+        return;
+      }
+
+      await navigator.clipboard.writeText(compressedUrl);
+      showMessage("Compressed share link copied to clipboard!");
+      return;
     }
-  };
+
+    // If compression fails, try base64 encoding
+    const json = JSON.stringify(dataToShare);
+    const encoded = btoa(encodeURIComponent(json));
+    const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
+
+    if (url.length > 2000) {
+      await createShareViaStorage(dataToShare);
+      return;
+    }
+
+    await navigator.clipboard.writeText(url);
+    showMessage("Share link copied to clipboard!");
+  } catch (error) {
+    console.error('Share link creation failed:', error);
+    showMessage("Error creating share link.");
+  }
+};
+
+// Alternative: Use a storage service for large data
+const createShareViaStorage = async (data) => {
+  try {
+    // Option 1: Use a simple paste service (like dpaste.com)
+    const response = await fetch('https://dpaste.com/api/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        content: JSON.stringify(data),
+        syntax: 'json',
+        expiry_days: 30
+      })
+    });
+
+    if (response.ok) {
+      const pasteUrl = response.url;
+      const shareUrl = `${window.location.origin}${window.location.pathname}?paste=${encodeURIComponent(pasteUrl)}`;
+      await navigator.clipboard.writeText(shareUrl);
+      showMessage("Share link created via storage service!");
+      return;
+    }
+
+    // Option 2: Use GitHub Gist as storage (requires no API key for public gists)
+    const gistResponse = await fetch('https://api.github.com/gists', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        files: {
+          'newsletter-data.json': {
+            content: JSON.stringify(data, null, 2)
+          }
+        },
+        public: false,
+        description: `Newsletter: ${data.name || 'Untitled'}`
+      })
+    });
+
+    if (gistResponse.ok) {
+      const gistData = await gistResponse.json();
+      const gistId = gistData.id;
+      const shareUrl = `${window.location.origin}${window.location.pathname}?gist=${gistId}`;
+      await navigator.clipboard.writeText(shareUrl);
+      showMessage("Share link created via GitHub Gist!");
+      return;
+    }
+
+    throw new Error('All storage methods failed');
+  } catch (error) {
+    console.error('Storage service failed:', error);
+    showMessage("Newsletter is too large to share directly. Consider reducing content size.");
+  }
+};
+
+// Function to load data from paste service
+const loadFromPasteService = async (pasteUrl) => {
+  try {
+    const response = await fetch(pasteUrl + '.txt'); // Most paste services provide .txt endpoint
+    const jsonData = await response.text();
+    const parsedData = JSON.parse(jsonData);
+
+    setElements(parsedData.elements);
+    setGlobalSettings(parsedData.globalSettings);
+    setNewsletterName(parsedData.name || 'Untitled Newsletter');
+    setShareDisabled(true);
+    setIsSharedDataLoaded(true);
+    showMessage("Loaded from paste service!");
+  } catch (error) {
+    console.error('Error loading from paste service:', error);
+    showMessage("Failed to load shared newsletter data.");
+  }
+};
+
+// Function to load data from GitHub Gist
+const loadFromGist = async (gistId) => {
+  try {
+    const response = await fetch(`https://api.github.com/gists/${gistId}`);
+    const gistData = await response.json();
+    const fileContent = Object.values(gistData.files)[0].content;
+    const parsedData = JSON.parse(fileContent);
+
+    setElements(parsedData.elements);
+    setGlobalSettings(parsedData.globalSettings);
+    setNewsletterName(parsedData.name || 'Untitled Newsletter');
+    setShareDisabled(true);
+    setIsSharedDataLoaded(true);
+    showMessage("Loaded from GitHub Gist!");
+  } catch (error) {
+    console.error('Error loading from gist:', error);
+    showMessage("Failed to load shared newsletter data.");
+  }
+};
 
   const prepareForExport = () => {
     exportLinkRects = [];
@@ -1314,5 +1499,6 @@ export default function EmailNewsletterEditor() {
         />
       </div>
     </div>
+    
   );
 }
