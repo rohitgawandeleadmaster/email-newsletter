@@ -213,6 +213,8 @@ export default function EmailNewsletterEditor() {
   const [message, setMessage] = useState("");
   const [shareDisabled, setShareDisabled] = useState(false);
   const [isSharedDataLoaded, setIsSharedDataLoaded] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [templateUrl, setTemplateUrl] = useState('');
 
   const dragItem = useRef(null);
   const canvasRef = useRef(null);
@@ -712,7 +714,76 @@ const loadFromGist = async (gistId) => {
     console.error('Error loading from gist:', error);
     showMessage("Failed to load shared newsletter data.");
   }
-};
+
+
+  // Template saving and loading functions for Cloudinary
+  const saveTemplateToCloudinary = async () => {
+    setIsSaving(true);
+    setMessage('Saving template...');
+
+    try {
+      const templateData = {
+        newsletterName,
+        globalSettings,
+        elements,
+      };
+
+      // Convert the data to a JSON string and create a Blob
+      const jsonString = JSON.stringify(templateData);
+      const jsonBlob = new Blob([jsonString], { type: 'application/json' });
+
+      const formData = new FormData();
+      formData.append('file', jsonBlob, 'newsletter-template.json');
+      formData.append('upload_preset', UPLOAD_PRESET);
+      formData.append('folder', 'newsletter-templates'); // Optional: store in a separate folder
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setTemplateUrl(result.secure_url);
+        setMessage('Template saved successfully!');
+        // Copy the URL to the clipboard for easy sharing
+        navigator.clipboard.writeText(result.secure_url);
+      } else {
+        throw new Error(result.error.message);
+      }
+    } catch (error) {
+      console.error('Template save error:', error);
+      setMessage(`Failed to save template: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadTemplateFromCloudinary = async (url) => {
+    setMessage('Loading template...');
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const templateData = await response.json();
+
+      // Update the component's state with the loaded data
+      setNewsletterName(templateData.newsletterName);
+      setGlobalSettings(templateData.globalSettings);
+      setElements(templateData.elements);
+
+      setMessage('Template loaded successfully!');
+
+    } catch (error) {
+      console.error('Template load error:', error);
+      setMessage(`Failed to load template: ${error.message}`);
+    }
+  };};
 
   const prepareForExport = () => {
     exportLinkRects = [];
@@ -1399,7 +1470,38 @@ const loadFromGist = async (gistId) => {
             >
               <Eye className="w-4 h-4" />
               Preview
+
+
+          {/* New: Template Save and Load Controls */}
+          <div className="flex items-center gap-3 ml-6">
+            <button
+              onClick={saveTemplateToCloudinary}
+              disabled={isSaving}
+              className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 ${
+                isSaving
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`}
+            >
+              <Save className="w-4 h-4" />
+              {isSaving ? "Saving..." : "Save Template"}
             </button>
+            <div className="relative">
+              <input
+                type="text"
+                value={templateUrl}
+                onChange={(e) => setTemplateUrl(e.target.value)}
+                placeholder="Paste template URL to load..."
+                className="border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={() => loadTemplateFromCloudinary(templateUrl)}
+                className="absolute right-0 top-0 h-full px-3 text-blue-500 hover:text-blue-700"
+              >
+                Load
+              </button>
+            </div>
+          </div>            </button>
           </div>
 
           {/* Export & Share Actions */}
