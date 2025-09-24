@@ -4,11 +4,15 @@ import EditorCanvas from "./EditorCanvas";
 import { MousePointer, Eye, Save, Send, Download, Share2 } from "lucide-react";
 import domToImage from "dom-to-image-more";
 import jsPDF from "jspdf";
+import { exportToEmailHtml } from "./ExportToEmailHtml";
+import { Link, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 // Add LZ-String compression library dynamically
-if (typeof window !== 'undefined' && !window.LZString) {
-  const script = document.createElement('script');
-  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js';
+if (typeof window !== "undefined" && !window.LZString) {
+  const script = document.createElement("script");
+  script.src =
+    "https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js";
   script.async = true;
   document.head.appendChild(script);
 }
@@ -199,6 +203,9 @@ export default function EmailNewsletterEditor() {
   ]);
 
   const [selectedElementId, setSelectedElementId] = useState(null);
+  const navigate = useNavigate(); // Initialize useNavigate
+  const [isSaving, setIsSaving] = useState(false);
+
   const [globalSettings, setGlobalSettings] = useState({
     backgroundColor: "#f5f5f5",
     maxWidth: "600px",
@@ -217,29 +224,146 @@ export default function EmailNewsletterEditor() {
   const dragItem = useRef(null);
   const canvasRef = useRef(null);
 
-  // Check for encoded data in the URL on initial load
- useEffect(() => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const templateUrl = urlParams.get("template");
-
-  if (templateUrl) {
-    fetch(templateUrl)
-      .then((res) => res.json())
-      .then((data) => {
-        setElements(data.elements);
-        setGlobalSettings(data.globalSettings);
-        setNewsletterName(data.name || "Untitled Newsletter");
-        setShareDisabled(true);
-        setIsSharedDataLoaded(true);
-        showMessage("Loaded from shared template!");
-      })
-      .catch((err) => {
-        console.error("Error loading shared template:", err);
-        showMessage("Failed to load shared template.");
+  // inside EmailNewsletterEditor.jsx, near other export helpers
+  const generateThumbnail = async () => {
+    try {
+      await ensureFontsLoaded();
+      const node = prepareForExport(); // already in file
+      if (!node) return "";
+      Object.assign(node.style, {
+        position: "absolute",
+        left: "-9999px",
+        top: "0",
+        zIndex: "-1",
       });
-  }
-}, []);
+      document.body.appendChild(node);
+      await new Promise((r) => setTimeout(r, 800));
+      const width = Math.min(320, parseInt(globalSettings.maxWidth || 600, 10));
+      const scale =
+        width / (parseInt(globalSettings.maxWidth || 600, 10) || 600);
+      const dataUrl = await domToImage.toPng(node, {
+        quality: 0.8,
+        bgcolor: globalSettings.newsletterColor || "#ffffff",
+        width: parseInt(globalSettings.maxWidth || 600, 10),
+        height: node.scrollHeight,
+        style: { transform: `scale(${scale})`, transformOrigin: "top left" },
+        filter: (el) => !el?.dataset?.noExport,
+      });
+      document.body.removeChild(node);
+      return dataUrl;
+    } catch {
+      return "";
+    }
+  };
 
+  // Check for encoded data in the URL on initial load
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const templateUrl = urlParams.get("template");
+
+    if (templateUrl) {
+      fetch(templateUrl)
+        .then((res) => res.json())
+        .then((data) => {
+          setElements(data.elements);
+          setGlobalSettings(data.globalSettings);
+          setNewsletterName(data.name || "Untitled Newsletter");
+          setShareDisabled(true);
+          setIsSharedDataLoaded(true);
+          showMessage("Loaded from shared template!");
+        })
+        .catch((err) => {
+          console.error("Error loading shared template:", err);
+          showMessage("Failed to load shared template.");
+        });
+    }
+  }, []);
+  const location = useLocation();
+
+  useEffect(() => {
+    const tpl = location?.state?.template;
+    const action = location?.state?.action; // "edit" | "send"
+    if (tpl && tpl.elements && tpl.globalSettings) {
+      setElements(tpl.elements);
+      setGlobalSettings(tpl.globalSettings);
+      setNewsletterName(tpl.name || "Untitled Newsletter");
+      setSelectedElementId(null);
+      // Optionally trigger send after render if requested
+      if (action === "send") {
+        setTimeout(() => {
+          try {
+            const html = exportToEmailHtml(
+              tpl.elements,
+              tpl.globalSettings,
+              tpl.name || newsletterName
+            );
+            // Replace clipboard with your actual send flow
+            navigator.clipboard.writeText(html);
+            showMessage("Email HTML ready to send (copied).");
+          } catch (e) {
+            showMessage("Failed to prepare email HTML.");
+          }
+        }, 100);
+      } else {
+        showMessage("Template loaded.");
+      }
+      // Clear state so back/forward doesn’t re-trigger
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [location]);
+
+  // EmailNewsletterEditor.jsx (top-level helpers)
+  const LS_KEY = "newsletter_templates_v1";
+  const loadTemplates = () => {
+    try {
+      return JSON.parse(localStorage.getItem(LS_KEY)) || [];
+    } catch {
+      return [];
+    }
+  };
+  const saveTemplates = (list) => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(list));
+    } catch {}
+  };
+  const genId = () =>
+    "tpl_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+  // inside component
+ const saveTemplateToLocal = async () => {
+  try {
+    const thumb = await generateThumbnail(); // generate preview
+    const id = genId();
+    const record = {
+      id,
+      name: newsletterName || "Untitled",
+      elements,
+      globalSettings,
+      thumbnailUrl: thumb, // attach thumbnail here
+      updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    const list = loadTemplates();
+    saveTemplates([record, ...list]);
+    showMessage("Template saved locally.");
+    navigate("/saved"); // Navigate to the "/saved" route after successful save
+  } catch (e) {
+    showMessage("Failed to generate thumbnail, saved without preview.");
+    const id = genId();
+    const record = {
+      id,
+      name: newsletterName || "Untitled",
+      elements,
+      globalSettings,
+      thumbnailUrl: "",
+      updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    const list = loadTemplates();
+    saveTemplates([record, ...list]);
+    navigate("/saved"); // Navigate to the "/saved" route even on failure
+  }
+};
   const showMessage = (text) => {
     setMessage(text);
     setTimeout(() => setMessage(""), 3000);
@@ -418,32 +542,36 @@ export default function EmailNewsletterEditor() {
     updateElement(id, { styles: styleUpdates });
   };
 
-
   const saveToCloudinary = async (data) => {
-  try {
-    const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
-    const formData = new FormData();
-    formData.append("file", blob);
-    formData.append("upload_preset", UPLOAD_PRESET);
-    formData.append("public_id", `newsletter_${Date.now()}`); // unique file name
-    formData.append("resource_type", "raw");
+    try {
+      const blob = new Blob([JSON.stringify(data)], {
+        type: "application/json",
+      });
+      const formData = new FormData();
+      formData.append("file", blob);
+      formData.append("upload_preset", UPLOAD_PRESET);
+      formData.append("public_id", `newsletter_${Date.now()}`); // unique file name
+      formData.append("resource_type", "raw");
 
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`, {
-      method: "POST",
-      body: formData,
-    });
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
-    const uploaded = await res.json();
-    if (uploaded.secure_url) {
-      return uploaded.secure_url; // URL of JSON file
-    } else {
-      throw new Error("Upload failed");
+      const uploaded = await res.json();
+      if (uploaded.secure_url) {
+        return uploaded.secure_url; // URL of JSON file
+      } else {
+        throw new Error("Upload failed");
+      }
+    } catch (err) {
+      console.error("Cloudinary save error:", err);
+      throw err;
     }
-  } catch (err) {
-    console.error("Cloudinary save error:", err);
-    throw err;
-  }
-};
+  };
 
   const handleImageUpload = async (id, file) => {
     if (!file || !file.type.startsWith("image")) return;
@@ -539,25 +667,27 @@ export default function EmailNewsletterEditor() {
   };
 
   const copyShareLink = async () => {
-  try {
-    const dataToShare = {
-      name: newsletterName,
-      elements,
-      globalSettings,
-    };
+    try {
+      const dataToShare = {
+        name: newsletterName,
+        elements,
+        globalSettings,
+      };
 
-    // Upload JSON to Cloudinary
-    const urlOnCloudinary = await saveToCloudinary(dataToShare);
+      // Upload JSON to Cloudinary
+      const urlOnCloudinary = await saveToCloudinary(dataToShare);
 
-    // Create a share link with template param
-    const url = `${window.location.origin}${window.location.pathname}?template=${encodeURIComponent(urlOnCloudinary)}`;
+      // Create a share link with template param
+      const url = `${window.location.origin}${
+        window.location.pathname
+      }?template=${encodeURIComponent(urlOnCloudinary)}`;
 
-    await navigator.clipboard.writeText(url);
-    showMessage("Share link copied to clipboard!");
-  } catch {
-    showMessage("Error creating share link.");
-  }
-};
+      await navigator.clipboard.writeText(url);
+      showMessage("Share link copied to clipboard!");
+    } catch {
+      showMessage("Error creating share link.");
+    }
+  };
 
   const prepareForExport = () => {
     exportLinkRects = [];
@@ -1185,114 +1315,156 @@ export default function EmailNewsletterEditor() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-white via-gray-50 to-white border-b-2 border-gray-300 px-6 py-4 flex items-center justify-between shadow-lg">
-        {/* Newsletter Name Input with Edit Button */}
-        <div className="flex-1 max-w-md relative group">
-          <input
-            type="text"
-            value={newsletterName}
-            onChange={(e) => setNewsletterName(e.target.value)}
-            className="text-xl font-bold bg-transparent border-none focus:outline-none text-gray-800 placeholder-gray-400 w-full pr-12 transition-all duration-300"
-            placeholder="Untitled Newsletter"
-          />
-          <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 w-0 group-focus-within:w-full transition-all duration-500 absolute bottom-0 left-0 rounded-full"></div>
+     <div className="bg-gradient-to-r from-white via-gray-50 to-white border-b-2 border-gray-300 px-6 py-4 flex items-center justify-between shadow-lg">
+      {/* Newsletter Name Input with Edit Button */}
+      <div className="flex-1 max-w-md relative group">
+        <input
+          type="text"
+          value={newsletterName}
+          onChange={(e) => setNewsletterName(e.target.value)}
+          className="text-xl font-bold bg-transparent border-none focus:outline-none text-gray-800 placeholder-gray-400 w-full pr-12 transition-all duration-300"
+          placeholder="Untitled Newsletter"
+        />
+        <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 w-0 group-focus-within:w-full transition-all duration-500 absolute bottom-0 left-0 rounded-full"></div>
 
-          {/* Edit Icon Button */}
-          <button
-            onClick={() =>
-              document
-                .querySelector('input[placeholder="Untitled Newsletter"]')
-                .focus()
-            }
-            className="absolute right-0 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-blue-500 transition-all duration-200 opacity-0 group-hover:opacity-100 hover:scale-110 rounded-full hover:bg-blue-50"
-            aria-label="Edit Newsletter Name"
+        {/* Edit Icon Button */}
+        <button
+          onClick={() =>
+            document
+              .querySelector('input[placeholder="Untitled Newsletter"]')
+              .focus()
+          }
+          className="absolute right-0 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-blue-500 transition-all duration-200 opacity-0 group-hover:opacity-100 hover:scale-110 rounded-full hover:bg-blue-50"
+          aria-label="Edit Newsletter Name"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0zM15.121 4.05L14 2.93l-1.414 1.414 1.121 1.121 1.414-1.414zM13.707 5.464L12.586 4.343 3.414 13.515l-.707 2.828 2.828-.707 9.172-9.172z" />
-            </svg>
+            <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0zM15.121 4.05L14 2.93l-1.414 1.414 1.121 1.121 1.414-1.414zM13.707 5.464L12.586 4.343 3.414 13.515l-.707 2.828 2.828-.707 9.172-9.172z" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex items-center gap-3">
+        {/* Templates Button with new styling */}
+        <button
+          onClick={() => navigate("/templates")}
+          className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-indigo-200 bg-indigo-600 text-white hover:bg-indigo-700 hover:ring-indigo-300"
+        >
+          Template Gallery
+        </button>
+
+        {/* Save Template Button */}
+        <button
+          onClick={saveTemplateToLocal}
+          
+          disabled={isSaving}
+          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-indigo-200 ${
+            isSaving
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:ring-indigo-300'
+          }`}
+        >
+          {isSaving ? 'Saving...' : 'Save Template'}
+        </button>
+      </div>
+
+      {/* Right Side Controls */}
+      <div className="flex items-center">
+        {/* View Toggle Buttons */}
+        <div className="flex items-center bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl p-1.5 mr-6 shadow-inner">
+          <button
+            onClick={() => setActiveView("editor")}
+            className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+              activeView === "editor"
+                ? "bg-white text-blue-600 shadow-md ring-2 ring-blue-100 transform scale-105"
+                : "text-gray-600 hover:text-gray-800 hover:bg-white/60"
+            }`}
+          >
+            <MousePointer className="w-4 h-4" />
+            Editor
+          </button>
+
+          <button
+            onClick={() => setActiveView("preview")}
+            className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+              activeView === "preview"
+                ? "bg-white text-blue-600 shadow-md ring-2 ring-blue-100 transform scale-105"
+                : "text-gray-600 hover:text-gray-800 hover:bg-white/60"
+            }`}
+          >
+            <Eye className="w-4 h-4" />
+            Preview
           </button>
         </div>
 
-        {/* Right Side Controls */}
-        <div className="flex items-center">
-          {/* View Toggle Buttons */}
-          <div className="flex items-center bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl p-1.5 mr-6 shadow-inner">
-            <button
-              onClick={() => setActiveView("editor")}
-              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-                activeView === "editor"
-                  ? "bg-white text-blue-600 shadow-md ring-2 ring-blue-100 transform scale-105"
-                  : "text-gray-600 hover:text-gray-800 hover:bg-white/60"
-              }`}
-            >
-              <MousePointer className="w-4 h-4" />
-              Editor
-            </button>
-
-            <button
-              onClick={() => setActiveView("preview")}
-              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-                activeView === "preview"
-                  ? "bg-white text-blue-600 shadow-md ring-2 ring-blue-100 transform scale-105"
-                  : "text-gray-600 hover:text-gray-800 hover:bg-white/60"
-              }`}
-            >
-              <Eye className="w-4 h-4" />
-              Preview
-            </button>
-          </div>
-
-          {/* Export & Share Actions */}
-          {activeView === "preview" && (
+        {/* Export & Share Actions */}
+        {activeView === "preview" && (
+          <div className="flex items-center gap-3">
+            {/* Export Buttons */}
             <div className="flex items-center gap-3">
-              {/* Export Buttons */}
-              <div className="flex items-center bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-1.5 shadow-inner">
-                <button
-                  onClick={downloadAsPdf}
-                  disabled={isExporting}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-                    isExporting
-                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      : "text-red-600 hover:bg-red-50 hover:text-red-700 hover:shadow-md hover:scale-105"
-                  }`}
-                >
-                  <Download className="w-4 h-4" />
-                  {isExporting ? "..." : "PDF"}
-                </button>
+              <button
+                onClick={downloadAsPdf}
+                disabled={isExporting}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-red-200 ${
+                  isExporting
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-red-600 text-white hover:bg-red-700 hover:ring-red-300"
+                }`}
+              >
+                <Download className="w-4 h-4" />
+                {isExporting ? "..." : "PDF"}
+              </button>
 
-                <button
-                  onClick={downloadAsImage}
-                  disabled={isExporting}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-                    isExporting
-                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 hover:shadow-md hover:scale-105"
-                  }`}
-                >
-                  <Download className="w-4 h-4" />
-                  {isExporting ? "..." : "PNG"}
-                </button>
-              </div>
-
-              {/* Share Button */}
-              {!shareDisabled && (
-                <button
-                  onClick={copyShareLink}
-                  className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Share
-                </button>
-              )}
+              <button
+                onClick={downloadAsImage}
+                disabled={isExporting}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-emerald-200 ${
+                  isExporting
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-emerald-600 text-white hover:bg-emerald-700 hover:ring-emerald-300"
+                }`}
+              >
+                <Download className="w-4 h-4" />
+                {isExporting ? "..." : "PNG"}
+              </button>
             </div>
-          )}
-        </div>
+
+            {/* Share Button */}
+            {!shareDisabled && (
+              <button
+                onClick={copyShareLink}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
+              >
+                <Share2 className="w-4 h-4" />
+                Share
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Export HTML Button */}
+      <button
+        onClick={() => {
+          const html = exportToEmailHtml({
+            elements,
+            globalSettings,
+            newsletterName,
+          });
+          navigator.clipboard.writeText(html);
+          alert(
+            "Email HTML copied to clipboard. Paste into Gmail or EmailJS."
+          );
+        }}
+        className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-yellow-200 bg-yellow-600 text-white hover:bg-yellow-700 hover:ring-yellow-300"
+      >
+        Export HTML
+      </button>
+    </div>
 
       {/* Save Alert */}
       {showSaveAlert && (
