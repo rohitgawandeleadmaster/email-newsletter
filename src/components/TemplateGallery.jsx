@@ -2,57 +2,113 @@ import React, { useState } from "react";
 
 const templatesData = [
   {
-    category: "Hospital",
-    color: "bg-red-500",
-    templates: [
-      { title: "Patient Updates", imageUrl: "/images/hospital-1.jpg", placeholderUrl: "public/HealthCare1.png", link: "https://email-newsletter-rcg1wxpu5-rohitgawandeleadmasters-projects.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758539939%2Fnewsletter_1758539939142" },
-      { title: "Health & Wellness", imageUrl: "/images/hospital-2.jpg", placeholderUrl: "public/HealthCare2.png", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758623030%2Fnewsletter_1758623031243" },
-      { title: "Emergency Services", imageUrl: "/images/hospital-3.jpg", placeholderUrl: "https://placehold.co/400x300/fed7aa/ea580c?text=hospital-3.jpg", link: "#" },
-    ],
-  },
-  {
-    category: "Education",
-    color: "bg-blue-500",
-    templates: [
-      { title: "School Newsletter", imageUrl: "/images/education-1.jpg", placeholderUrl: "https://placehold.co/400x300/bfdbfe/1e40af?text=education-1.jpg", link: "#" },
-      { title: "Parent-Teacher Updates", imageUrl: "/images/education-2.jpg", placeholderUrl: "https://placehold.co/400x300/c7d2fe/3730a3?text=education-2.jpg", link: "#" },
-      { title: "Student Life", imageUrl: "/images/education-3.jpg", placeholderUrl: "https://placehold.co/400x300/e0e7ff/4338ca?text=education-3.jpg", link: "#" },
-    ],
-  },
-  {
-    category: "Ed Tech",
-    color: "bg-purple-500",
-    templates: [
-      { title: "LMS Launch", imageUrl: "/images/edtech-1.jpg", placeholderUrl: "https://placehold.co/400x300/e9d5ff/6b21a8?text=edtech-1.jpg", link: "#" },
-      { title: "Course Catalog", imageUrl: "/images/edtech-2.jpg", placeholderUrl: "https://placehold.co/400x300/d8b4fe/7e22ce?text=edtech-2.jpg", link: "#" },
-      { title: "Feature Release", imageUrl: "/images/edtech-3.jpg", placeholderUrl: "https://placehold.co/400x300/f3e8ff/a855f7?text=edtech-3.jpg", link: "#" },
-    ],
-  },
-  {
-    category: "Retail",
+    category: "Real Estate",
     color: "bg-green-500",
     templates: [
-      { title: "New Arrivals", imageUrl: "/images/retail-1.jpg", placeholderUrl: "https://placehold.co/400x300/d1fae5/065f46?text=retail-1.jpg", link: "#" },
-      { title: "Seasonal Sale", imageUrl: "/images/retail-2.jpg", placeholderUrl: "https://placehold.co/400x300/a7f3d0/047857?text=retail-2.jpg", link: "#" },
-      { title: "Weekly Promotions", imageUrl: "/images/retail-3.jpg", placeholderUrl: "https://placehold.co/400x300/6ee7b7/059669?text=retail-3.jpg", link: "#" },
+      { title: "New Property Listing (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/d1fae5/065f46?text=New+Property", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758711256%2Fnewsletter_1758711255646"},
+      { title: "Limited-Time Offer (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/a7f3d0/047857?text=Limited+Offer", link: "#" },
+      { title: "Monthly Newsletter (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/6ee7b7/059669?text=Monthly+Newsletter", link: "#" },
+      // { title: "Quick Offer Alert (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/dcfce7/4338ca?text=Quick+Offer", link: "#" },
+      // { title: "Site Visit Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/bbf7d0/4338ca?text=Site+Visit", link: "#" },
     ],
   },
   {
-    category: "Ecommerce",
-    color: "bg-yellow-500",
-    templates: [
-      { title: "Abandoned Cart", imageUrl: "/images/ecommerce-1.jpg", placeholderUrl: "https://placehold.co/400x300/fef08a/b45309?text=ecommerce-1.jpg", link: "#" },
-      { title: "Order Confirmation", imageUrl: "/images/ecommerce-2.jpg", placeholderUrl: "https://placehold.co/400x300/fde047/a16207?text=ecommerce-2.jpg", link: "#" },
-      { title: "Product Showcase", imageUrl: "/images/ecommerce-3.jpg", placeholderUrl: "https://placehold.co/400x300/fcd34d/d97706?text=ecommerce-3.jpg", link: "#" },
-    ],
-  },
-  {
-    category: "Resorts",
+    category: "Financial Services",
     color: "bg-indigo-500",
     templates: [
-      { title: "Booking Confirmation", imageUrl: "/images/resorts-1.jpg", placeholderUrl: "https://placehold.co/400x300/c7d2fe/3730a3?text=resorts-1.jpg", link: "#" },
-      { title: "Exclusive Offers", imageUrl: "/images/resorts-2.jpg", placeholderUrl: "https://placehold.co/400x300/a5b4fc/4338ca?text=resorts-2.jpg", link: "#" },
-      { title: "Upcoming Events", imageUrl: "/images/resorts-3.jpg", placeholderUrl: "https://placehold.co/400x300/818cf8/4f46e5?text=resorts-3.jpg", link: "#" },
+      { title: "Product Promo (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/c7d2fe/3730a3?text=Product+Promo", link: "#" },
+      { title: "Educational Drip Campaign (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/a5b4fc/4338ca?text=Educational+Campaign", link: "#" },
+      { title: "Payment Reminder (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/818cf8/4f46e5?text=Payment+Reminder", link: "#" },
+      // { title: "KYC/Payment Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/e0e7ff/4338ca?text=KYC+Reminder", link: "#" },
+      // { title: "New Product Alert (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/bfdbfe/4338ca?text=New+Product+Alert", link: "#" },
+    ],
+  },
+  {
+    category: "Healthcare & Wellness",
+    color: "bg-teal-500",
+    templates: [
+      { title: "Health Camp Invite (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/ccfbf1/0f766e?text=Health+Camp", link: "https://email-newsletter-rcg1wxpu5-rohitgawandeleadmasters-projects.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758539939%2Fnewsletter_1758539939142" },
+      { title: "Service Promotion (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/99f6e4/0d9488?text=Service+Promo", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758623030%2Fnewsletter_1758623031243" },
+      { title: "Wellness Newsletter (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/5eead4/0d9488?text=Wellness+Newsletter", link: "#" },
+      // { title: "Appointment Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/c7f6f1/4338ca?text=Appointment+Reminder", link: "#" },
+      // { title: "Lab/Test Result Updates (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/a8f0ed/4338ca?text=Lab+Results", link: "#" },
+    ],
+  },
+  {
+    category: "Education & Training",
+    color: "bg-blue-500",
+    templates: [
+      { title: "Course Enrollment (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/bfdbfe/1e40af?text=Course+Enrollment", link: "#" },
+      { title: "Open House/Webinar Invite (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/c7d2fe/3730a3?text=Webinar+Invite", link: "#" },
+      { title: "Student Success Story (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/e0e7ff/4338ca?text=Student+Success", link: "#" },
+      // { title: "Inquiry Follow-up (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/e0e7ff/4338ca?text=Inquiry+Followup", link: "#" },
+      // { title: "Webinar Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/bfdbfe/4338ca?text=Webinar+Reminder", link: "#" },
+    ],
+  },
+  {
+    category: "Retail & E-commerce",
+    color: "bg-red-500",
+    templates: [
+      { title: "Promo Offer (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/fecaca/991b1b?text=Promo+Offer", link: "#" },
+      { title: "New Arrivals (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/fbcfe8/be185d?text=New+Arrivals", link: "#" },
+      { title: "Abandoned Cart Reminder (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/fed7aa/ea580c?text=Abandoned+Cart", link: "#" },
+      // { title: "Flash Sale Alert (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/fecdd3/4338ca?text=Flash+Sale+Alert", link: "#" },
+      // { title: "Product Catalog Showcase (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/fbcfe8/4338ca?text=Product+Catalog", link: "#" },
+    ],
+  },
+  {
+    category: "Travel & Hospitality",
+    color: "bg-cyan-500",
+    templates: [
+      { title: "Tour Package Promo (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/cffafe/0695ab?text=Tour+Package", link: "#" },
+      { title: "Personalized Offers (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/a5f3fc/0891b2?text=Personalized+Offers", link: "#" },
+      { title: "Booking Confirmation (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/67e8f9/06b6d4?text=Booking+Confirmation", link: "#" },
+      // { title: "Reservation Confirm (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/cffafe/4338ca?text=Reservation+Confirm", link: "#" },
+      // { title: "Flight/Trip Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/a5f3fc/4338ca?text=Flight+Reminder", link: "#" },
+    ],
+  },
+  {
+    category: "Technology & SaaS",
+    color: "bg-purple-500",
+    templates: [
+      { title: "Product Demo Invite (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/e9d5ff/6b21a8?text=Product+Demo", link: "#" },
+      { title: "Case Study/Whitepaper (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/d8b4fe/7e22ce?text=Case+Study", link: "#" },
+      { title: "Onboarding Series (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/f3e8ff/a855f7?text=Onboarding+Series", link: "#" },
+      // { title: "Trial Signup Follow-up (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/f3e8ff/4338ca?text=Trial+Followup", link: "#" },
+      // { title: "Quick Support Check-in (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/d8b4fe/4338ca?text=Support+Checkin", link: "#" },
+    ],
+  },
+  {
+    category: "Media & Entertainment",
+    color: "bg-pink-500",
+    templates: [
+      { title: "Event Promotion (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/fce7f3/9d174d?text=Event+Promo", link: "#" },
+      { title: "Content Recommendations (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/fbcfe8/be185d?text=Content+Recs", link: "#" },
+      { title: "Subscription Renewal (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/f9a8d4/db2777?text=Subscription+Renewal", link: "#" },
+      // { title: "Event Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/fbcfe8/4338ca?text=Event+Reminder", link: "#" },
+      // { title: "New Content Alert (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/fce7f3/4338ca?text=New+Content+Alert", link: "#" },
+    ],
+  },
+  {
+    category: "Automotive",
+    color: "bg-gray-500",
+    templates: [
+      { title: "New Car Launch (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/e5e7eb/6b7280?text=New+Car+Launch", link: "#" },
+      { title: "Promo Offer (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/d1d5db/6b7280?text=Promo+Offer", link: "#" },
+      { title: "Follow-up Post-Inquiry (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/9ca3af/6b7280?text=Inquiry+Followup", link: "#" },
+      // { title: "Service Camp Alert (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/d1d5db/4338ca?text=Service+Camp", link: "#" },
+      // { title: "Test Drive Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/e5e7eb/4338ca?text=Test+Drive+Reminder", link: "#" },
+    ],
+  },
+  {
+    category: "Professional Services",
+    color: "bg-yellow-500",
+    templates: [
+      { title: "Services Intro (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/fef08a/b45309?text=Services+Intro", link: "#" },
+      { title: "Case Study Newsletter (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/fde047/a16207?text=Case+Study", link: "#" },
+      { title: "Client Testimonial (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/fcd34d/d97706?text=Client+Testimonial", link: "#" },
+      // { title: "Meeting Follow-up (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/fef3c7/4338ca?text=Meeting+Followup", link: "#" },
+      // { title: "Consultation Scheduling (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/fde047/4338ca?text=Consult+Scheduling", link: "#" },
     ],
   },
 ];
@@ -72,7 +128,7 @@ export default function TemplateGallery() {
             Template Gallery 🎨
           </h1>
           <p className="mt-4 text-lg text-gray-600">
-            Choose from a variety of professionally designed email newsletter templates to get started.
+            Choose from a variety of professionally designed email newsletter and WhatsApp templates to get started.
           </p>
         </div>
 
@@ -94,7 +150,7 @@ export default function TemplateGallery() {
               onClick={() => setSelectedCategory(section.category)}
               className={`px-4 py-2 rounded-full font-medium transition-colors duration-200 ${
                 selectedCategory === section.category
-                  ? `${section.color.replace('bg-', 'bg-')} text-white shadow-lg`
+                  ? `${section.color} text-white shadow-lg`
                   : "bg-white text-gray-800 hover:bg-gray-200"
               }`}
             >
@@ -113,16 +169,16 @@ export default function TemplateGallery() {
               {section.templates.map((template, templateIndex) => (
                 <div
                   key={templateIndex}
-                  className="bg-white rounded-lg shadow-xl overflow-hidden transform transition duration-300 hover:scale-105 hover:shadow-2xl group"
+                  className="bg-white rounded-lg shadow-xl overflow-hidden transform transition duration-300 hover:scale-105 hover:shadow-2xl group border border-gray-200"
                 >
                   <a href={template.link} target="_blank" rel="noopener noreferrer" className="block relative">
                     <img
                       src={template.placeholderUrl}
                       alt={template.title}
-                      className="w-full h-200 object-cover rounded-t-lg"
+                      className="w-full h-64 object-cover rounded-t-lg transition-opacity duration-300 group-hover:opacity-50"
                     />
-                    <div className="absolute inset-0 bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <p className="text-white text-lg font-semibold">Click to Edit</p>
+                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <p className="text-white text-lg font-semibold">Click to Edit Template</p>
                     </div>
                   </a>
                   <div className="p-4">
