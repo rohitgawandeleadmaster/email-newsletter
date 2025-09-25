@@ -5,7 +5,7 @@ import { MousePointer, Eye, Save, Send, Download, Share2 } from "lucide-react";
 import domToImage from "dom-to-image-more";
 import jsPDF from "jspdf";
 import { exportToEmailHtml } from "./ExportToEmailHtml";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 
 // Add LZ-String compression library dynamically
@@ -1369,6 +1369,20 @@ export default function EmailNewsletterEditor() {
           }`}
         >
           {isSaving ? 'Saving...' : 'Save Template'}
+        </button>
+
+         {/* Save Template Button */}
+        <button
+         onClick={() => navigate("/saved")}
+          
+         
+          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-indigo-200 ${
+            isSaving
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:ring-indigo-300'
+          }`}
+        >
+          {isSaving ? 'opening...' : 'Saved Templates'}
         </button>
       </div>
 
