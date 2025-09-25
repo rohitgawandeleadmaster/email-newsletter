@@ -48,6 +48,7 @@ export default function EditorSidebar({
   updateElementStyle,
   handleImageUpload,
   deleteElement,
+   toggleStyle
 }) {
   const [activeTab, setActiveTab] = useState("elements");
   const propertiesRef = useRef(null);
@@ -455,7 +456,7 @@ export default function EditorSidebar({
             </div>
 
             <div
-              className="w-full max-w-full overflow-hidden bg-gradient-to-br from-purple-50/50 to-indigo-50/50 rounded-lg p-4 border border-purple-200/50"
+              className="w-full max-w-full overflow-visible bg-gradient-to-br from-purple-50/50 to-indigo-50/50 rounded-lg p-4 border border-purple-200/50"
               onClick={(e) => e.stopPropagation()}
             >
               {(selectedElement.type === "text" ||
@@ -466,6 +467,7 @@ export default function EditorSidebar({
                   updateElementStyle={updateElementStyle}
                   deleteElement={deleteElement}
                   handleImageUpload={handleImageUpload}
+                   toggleStyle={toggleStyle} // ✅ Pass the function
                 />
               )}
 

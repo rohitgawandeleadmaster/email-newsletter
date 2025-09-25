@@ -22,6 +22,20 @@ const EditorCanvas = forwardRef(
     },
     ref
   ) => {
+
+//     const defaultTextStyles = {
+//   fontFamily: "Arial, sans-serif",
+//   fontSize: "20px",
+//   fontWeight: "700",           // bold
+//   fontStyle: "italic",         // italic
+//   textDecoration: "underline", // underline
+//   textShadow: "2px 2px 4px rgba(0,0,0,0.3)", // shadow with color
+//   color: "#333333",
+//   backgroundColor: "transparent",
+//   padding: "0px 0px",
+//   margin: "0px 0px",
+// };
+
     const handleDrop = (e) => {
       e.preventDefault();
 
@@ -65,6 +79,9 @@ const EditorCanvas = forwardRef(
         addElement(type, {
           left: `${clampedLeft}px`,
           top: `${clampedTop}px`,
+           left: `${clampedLeft}px`,
+  top: `${clampedTop}px`,
+  // styles: defaultTextStyles, // ✅ add default styles
         });
         return;
       }
@@ -294,10 +311,14 @@ const EditorCanvas = forwardRef(
             elementOptions.link = elementData.link;
           }
 
-          addElement(elementData.type, {
-            ...elementOptions,
-            content: elementData.content,
-          });
+        addElement(elementData.type, {
+  ...elementOptions,
+  content: elementData.content,
+  styles:
+    elementData.type === "text" || elementData.type === "header"
+      ? defaultTextStyles
+      : {}, // only apply text styles to text/header
+});
 
           yOffset += spacing; // Increment the vertical position for the next element
         });
@@ -378,6 +399,7 @@ const EditorCanvas = forwardRef(
                     handleDragStart={handleDragStart}
                     handleDragEnter={handleDragEnter}
                     handleDragEnd={handleDragEnd}
+                    
                   />
                 </div>
               ))}

@@ -31,7 +31,10 @@ export default function TextPropertiesPanel({
   updateElement,
   updateElementStyle,
   deleteElement,
+  toggleStyle
 }) {
+
+
   if (!element) return null;
 
   // ✅ Merge styles safely
@@ -45,86 +48,66 @@ export default function TextPropertiesPanel({
   };
 
   const fontOptions = [
-    { value: "Arial, sans-serif", category: "Sans Serif", display: "Arial" },
-    {
-      value: "Helvetica, sans-serif",
-      category: "Sans Serif",
-      display: "Helvetica",
-    },
-    { value: "Roboto, sans-serif", category: "Sans Serif", display: "Roboto" },
-    {
-      value: "Open Sans, sans-serif",
-      category: "Sans Serif",
-      display: "Open Sans",
-    },
-    { value: "Lato, sans-serif", category: "Sans Serif", display: "Lato" },
-    {
-      value: "Montserrat, sans-serif",
-      category: "Sans Serif",
-      display: "Montserrat",
-    },
-    {
-      value: "Poppins, sans-serif",
-      category: "Sans Serif",
-      display: "Poppins",
-    },
-    { value: "Inter, sans-serif", category: "Sans Serif", display: "Inter" },
-    {
-      value: "Raleway, sans-serif",
-      category: "Sans Serif",
-      display: "Raleway",
-    },
-    { value: "Oswald, sans-serif", category: "Sans Serif", display: "Oswald" },
-    {
-      value: "Times New Roman, serif",
-      category: "Serif",
-      display: "Times New Roman",
-    },
-    { value: "Georgia, serif", category: "Serif", display: "Georgia" },
-    { value: "Garamond, serif", category: "Serif", display: "Garamond" },
-    {
-      value: "Playfair Display, serif",
-      category: "Serif",
-      display: "Playfair Display",
-    },
-    {
-      value: "Merriweather, serif",
-      category: "Serif",
-      display: "Merriweather",
-    },
-    { value: "Baskerville, serif", category: "Serif", display: "Baskerville" },
-    { value: "Palatino, serif", category: "Serif", display: "Palatino" },
-    { value: "Bodoni, serif", category: "Serif", display: "Bodoni" },
-    {
-      value: "Courier New, monospace",
-      category: "Monospace",
-      display: "Courier New",
-    },
-    {
-      value: "Calibri, sans-serif",
-      category: "Sans Serif",
-      display: "Calibri",
-    },
-    {
-      value: "Verdana, sans-serif",
-      category: "Sans Serif",
-      display: "Verdana",
-    },
-    { value: "Tahoma, sans-serif", category: "Sans Serif", display: "Tahoma" },
-    { value: "Futura, sans-serif", category: "Sans Serif", display: "Futura" },
-    {
-      value: "Gill Sans, sans-serif",
-      category: "Sans Serif",
-      display: "Gill Sans",
-    },
-    { value: "Avenir, sans-serif", category: "Sans Serif", display: "Avenir" },
-    {
-      value: "Franklin Gothic, sans-serif",
-      category: "Sans Serif",
-      display: "Franklin Gothic",
-    },
-    { value: "Didot, serif", category: "Serif", display: "Didot" },
-  ];
+  // Sans-Serif
+  { value: 'Arial, sans-serif', category: 'Sans Serif', display: 'Arial' },
+  { value: 'Verdana, sans-serif', category: 'Sans Serif', display: 'Verdana' },
+  { value: 'Tahoma, sans-serif', category: 'Sans Serif', display: 'Tahoma' },
+  { value: 'Trebuchet MS, sans-serif', category: 'Sans Serif', display: 'Trebuchet MS' },
+  { value: 'Segoe UI, sans-serif', category: 'Sans Serif', display: 'Segoe UI' },
+  { value: 'Calibri, sans-serif', category: 'Sans Serif', display: 'Calibri' },
+  { value: 'Corbel, sans-serif', category: 'Sans Serif', display: 'Corbel' },
+  { value: 'Candara, sans-serif', category: 'Sans Serif', display: 'Candara' },
+  { value: 'Gill Sans, sans-serif', category: 'Sans Serif', display: 'Gill Sans' },
+  { value: 'Franklin Gothic Medium, sans-serif', category: 'Sans Serif', display: 'Franklin Gothic' },
+  { value: 'Century Gothic, sans-serif', category: 'Sans Serif', display: 'Century Gothic' },
+  { value: 'Futura, sans-serif', category: 'Sans Serif', display: 'Futura' },
+  { value: 'Avenir, sans-serif', category: 'Sans Serif', display: 'Avenir' },
+  { value: 'Lucida Sans Unicode, sans-serif', category: 'Sans Serif', display: 'Lucida Sans Unicode' },
+  { value: 'Segoe Print, sans-serif', category: 'Sans Serif', display: 'Segoe Print' },
+
+  // Serif
+  { value: 'Times New Roman, serif', category: 'Serif', display: 'Times New Roman' },
+  { value: 'Georgia, serif', category: 'Serif', display: 'Georgia' },
+  { value: 'Garamond, serif', category: 'Serif', display: 'Garamond' },
+  { value: 'Palatino Linotype, Book Antiqua, Palatino, serif', category: 'Serif', display: 'Palatino Linotype' },
+  { value: 'Cambria, serif', category: 'Serif', display: 'Cambria' },
+  { value: 'Constantia, serif', category: 'Serif', display: 'Constantia' },
+  { value: 'Baskerville, serif', category: 'Serif', display: 'Baskerville' },
+  { value: 'Didot, serif', category: 'Serif', display: 'Didot' },
+  { value: 'Book Antiqua, serif', category: 'Serif', display: 'Book Antiqua' },
+  { value: 'Century Schoolbook, serif', category: 'Serif', display: 'Century Schoolbook' },
+
+  // Monospace
+  { value: 'Courier New, monospace', category: 'Monospace', display: 'Courier New' },
+  { value: 'Consolas, monospace', category: 'Monospace', display: 'Consolas' },
+  { value: 'Lucida Console, monospace', category: 'Monospace', display: 'Lucida Console' },
+  { value: 'Monaco, monospace', category: 'Monospace', display: 'Monaco' },
+  { value: 'Source Code Pro, monospace', category: 'Monospace', display: 'Source Code Pro' },
+
+  // Script / Cursive
+  { value: 'Brush Script MT, cursive', category: 'Script', display: 'Brush Script MT' },
+  { value: 'Edwardian Script ITC, cursive', category: 'Script', display: 'Edwardian Script ITC' },
+  { value: 'Freestyle Script, cursive', category: 'Script', display: 'Freestyle Script' },
+  { value: 'French Script MT, cursive', category: 'Script', display: 'French Script MT' },
+  { value: 'Segoe Script, cursive', category: 'Script', display: 'Segoe Script' },
+  { value: 'Lucida Handwriting, cursive', category: 'Script', display: 'Lucida Handwriting' },
+  { value: 'Kristen ITC, cursive', category: 'Script', display: 'Kristen ITC' },
+
+  // Display / Decorative
+  { value: 'Impact, sans-serif', category: 'Display', display: 'Impact' },
+  { value: 'Copperplate Gothic, serif', category: 'Display', display: 'Copperplate Gothic' },
+  { value: 'Rockwell, serif', category: 'Display', display: 'Rockwell' },
+  { value: 'Algerian, serif', category: 'Display', display: 'Algerian' },
+  { value: 'Jokerman, cursive', category: 'Display', display: 'Jokerman' },
+  { value: 'Chiller, cursive', category: 'Display', display: 'Chiller' },
+  { value: 'Engravers MT, serif', category: 'Display', display: 'Engravers MT' },
+  { value: 'Elephant, serif', category: 'Display', display: 'Elephant' },
+  { value: 'Stencil, sans-serif', category: 'Display', display: 'Stencil' },
+  { value: 'Vivaldi, cursive', category: 'Display', display: 'Vivaldi' },
+  { value: 'Papyrus, sans-serif', category: 'Display', display: 'Papyrus' },
+  { value: 'Snap ITC, sans-serif', category: 'Display', display: 'Snap ITC' },
+];
+
 
   const groupedFonts = fontOptions.reduce((groups, font) => {
     if (!groups[font.category]) groups[font.category] = [];
@@ -212,6 +195,31 @@ export default function TextPropertiesPanel({
                       </Badge>
                     </div>
                   </div>
+{/* <div className="text-toolbar flex gap-2 mb-2">
+  <button
+    onClick={() => toggleStyle("fontWeight", "bold")}
+    className={element.styles.fontWeight === "bold" ? "active" : ""}
+  >
+    B
+  </button>
+  <button
+    onClick={() => toggleStyle("fontStyle", "italic")}
+    className={element.styles.fontStyle === "italic" ? "active" : ""}
+  >
+    I
+  </button>
+  <button
+    onClick={() => toggleStyle("textDecoration", "underline")}
+    className={element.styles.textDecoration === "underline" ? "active" : ""}
+  >
+    U
+  </button>
+  <button
+    onClick={() => toggleStyle("textShadow", "2px 2px 4px rgba(0,0,0,0.3)")}
+  >
+    Shadow
+  </button>
+</div> */}
 
                   <div className="space-y-2">
                     <Label className="text-sm font-medium flex items-center gap-1">

@@ -1448,7 +1448,7 @@ export default function EmailNewsletterEditor() {
             </div>
 
             {/* Share Button */}
-            {!shareDisabled && (
+            {/* {!shareDisabled && (
               <button
                 onClick={copyShareLink}
                 className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
@@ -1456,7 +1456,14 @@ export default function EmailNewsletterEditor() {
                 <Share2 className="w-4 h-4" />
                 Share
               </button>
-            )}
+            )} */}
+            <button
+  onClick={copyShareLink}
+  className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
+>
+  <Share2 className="w-4 h-4" />
+  Share
+</button>
           </div>
         )}
       </div>
@@ -1507,6 +1514,7 @@ export default function EmailNewsletterEditor() {
             updateElementStyle={updateElementStyle}
             handleImageUpload={handleImageUpload}
             deleteElement={deleteElement}
+            
           />
         )}
 
@@ -1527,6 +1535,7 @@ export default function EmailNewsletterEditor() {
           handleImageUpload={handleImageUpload}
           addElement={addElement}
           preservePositions={true}
+          
         />
       </div>
     </div>

@@ -65,6 +65,8 @@ const ResizableElementWrapper = ({
   selected,
   onSelect,
   activeView,
+  toggleStyle
+  
 }) => {
   const elementRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -77,7 +79,7 @@ const ResizableElementWrapper = ({
   const shouldUseAbsolutePositioning =
     (activeView === "editor" || activeView === "preview") &&
     element.type !== "section";
-
+ 
   const onMouseDown = (e, type) => {
     if (activeView !== "editor") return;
 
@@ -229,6 +231,11 @@ const ResizableElementWrapper = ({
       className: "top-1/2 left-0 -translate-y-1/2 cursor-ew-resize",
     },
   ];
+  // Only show toolbar for text or header elements in editor
+  const showToolbar =
+    selected && activeView === "editor" && (element.type === "text" || element.type === "header");
+
+ 
 
   const wrapperStyles = shouldUseAbsolutePositioning
     ? {
@@ -330,10 +337,29 @@ export default function ElementRenderer({
   activeView,
   setSelectedElementId,
   globalSettings,
+  
+  
 }) {
   const fileInputRef = useRef(null);
   const { id, type, content, styles, link, icons, children } = element;
+// ✅ Add toggleStyle here
+  const toggleStyle = (property, value) => {
+    const current = element.styles[property] || "";
+    let newValue;
 
+    if (property === "fontWeight" || property === "fontStyle" || property === "textDecoration") {
+      newValue = current === value ? "normal" : value;
+    } else {
+      newValue = current ? "" : value; // for shadow, toggle on/off
+    }
+
+    updateElement(element.id, {
+      styles: {
+        ...element.styles,
+        [property]: newValue,
+      },
+    });
+  };
   // ✅ CLEAN EXPORT FIX: Only apply editor helpers in editor mode
   const editorHelpers = activeView === "editor" ? "editor-border" : "";
   // ✅ Helper to build spacing from individual properties
@@ -372,6 +398,11 @@ export default function ElementRenderer({
       margin: baseStyles.margin,
       fontSize: baseStyles.fontSize,
       fontWeight: baseStyles.fontWeight,
+      fontWeight: baseStyles.fontWeight, // bold support
+    fontStyle: baseStyles.fontStyle, // italic support
+    textDecoration: baseStyles.textDecoration, // underline, line-through
+    textShadow: baseStyles.textShadow, // shadow string
+      fontFamily: baseStyles.fontFamily || "inherit", // 👈 Add this
       textAlign: baseStyles.textAlign,
       boxShadow: baseStyles.boxShadow,
       opacity: baseStyles.opacity,
@@ -448,7 +479,20 @@ export default function ElementRenderer({
 
       case "text":
         return (
+      //     <div style={{ position: "relative" }}>
+      // {/* Toolbar for bold/italic/underline/shadow */}
+      // {selected && activeView === "editor" && (
+      //   <div className="text-toolbar flex gap-2 mb-1">
+      //     <button onClick={() => toggleStyle("fontWeight", "bold")}>B</button>
+      //     <button onClick={() => toggleStyle("fontStyle", "italic")}>I</button>
+      //     <button onClick={() => toggleStyle("textDecoration", "underline")}>U</button>
+      //     <button onClick={() => toggleStyle("textShadow", "2px 2px 4px rgba(0,0,0,0.3)")}>
+      //       Shadow
+      //     </button>
+      //   </div>
+      // )}
           <div
+          
             contentEditable={activeView === "editor"}
             suppressContentEditableWarning
             className={`text-element outline-none ${editorHelpers}`}
@@ -463,6 +507,10 @@ export default function ElementRenderer({
               fontWeight: contentStyles.fontWeight,
               textAlign: contentStyles.textAlign,
               boxShadow: contentStyles.boxShadow,
+               fontWeight: contentStyles.fontWeight, // bold
+        fontStyle: contentStyles.fontStyle, // italic
+        textDecoration: contentStyles.textDecoration, // underline/line-through
+        textShadow: contentStyles.textShadow, // shadow with color
             }}
             onBlur={(e) => {
               if (activeView === "editor") {
@@ -472,7 +520,8 @@ export default function ElementRenderer({
           >
             {content ||
               (activeView === "editor" ? "Enter your text here..." : null)}
-          </div>
+          </div>   
+      
         );
 
       case "header":
@@ -497,6 +546,10 @@ export default function ElementRenderer({
               fontWeight: contentStyles.fontWeight,
               textAlign: contentStyles.textAlign,
               boxShadow: contentStyles.boxShadow,
+               fontWeight: contentStyles.fontWeight, // bold
+        fontStyle: contentStyles.fontStyle, // italic
+        textDecoration: contentStyles.textDecoration, // underline/line-through
+        textShadow: contentStyles.textShadow, // shadow with color
             }}
           >
             {content || (activeView === "editor" ? "Header Text" : null)}
@@ -783,12 +836,14 @@ export default function ElementRenderer({
       updateElement={updateElement}
       handleImageUpload={handleImageUpload}
       selected={selected}
+      toggleStyle={toggleStyle} // ✅ Pass as prop
       onSelect={() => {
         if (activeView === "editor") {
           setSelectedElementId(element.id);
         }
       }}
       activeView={activeView}
+      
     >
       {renderContent()}
     </ResizableElementWrapper>
