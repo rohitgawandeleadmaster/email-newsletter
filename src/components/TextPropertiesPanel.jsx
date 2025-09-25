@@ -47,7 +47,7 @@ export default function TextPropertiesPanel({
     });
   };
 
-  const fontOptions = [
+const fontOptions = [
   // Sans-Serif
   { value: 'Arial, sans-serif', category: 'Sans Serif', display: 'Arial' },
   { value: 'Verdana, sans-serif', category: 'Sans Serif', display: 'Verdana' },
@@ -64,6 +64,13 @@ export default function TextPropertiesPanel({
   { value: 'Avenir, sans-serif', category: 'Sans Serif', display: 'Avenir' },
   { value: 'Lucida Sans Unicode, sans-serif', category: 'Sans Serif', display: 'Lucida Sans Unicode' },
   { value: 'Segoe Print, sans-serif', category: 'Sans Serif', display: 'Segoe Print' },
+  { value: 'Poppins, sans-serif', category: 'Sans Serif', display: 'Poppins' }, // ✅ Added
+  { value: 'Helvetica, sans-serif', category: 'Sans Serif', display: 'Helvetica' },
+  { value: 'Open Sans, sans-serif', category: 'Sans Serif', display: 'Open Sans' },
+  { value: 'Roboto, sans-serif', category: 'Sans Serif', display: 'Roboto' },
+  { value: 'Lato, sans-serif', category: 'Sans Serif', display: 'Lato' },
+  { value: 'Montserrat, sans-serif', category: 'Sans Serif', display: 'Montserrat' },
+  { value: 'Noto Sans, sans-serif', category: 'Sans Serif', display: 'Noto Sans' },
 
   // Serif
   { value: 'Times New Roman, serif', category: 'Serif', display: 'Times New Roman' },
@@ -76,6 +83,8 @@ export default function TextPropertiesPanel({
   { value: 'Didot, serif', category: 'Serif', display: 'Didot' },
   { value: 'Book Antiqua, serif', category: 'Serif', display: 'Book Antiqua' },
   { value: 'Century Schoolbook, serif', category: 'Serif', display: 'Century Schoolbook' },
+  { value: 'Merriweather, serif', category: 'Serif', display: 'Merriweather' }, // ✅ Added
+  { value: 'Playfair Display, serif', category: 'Serif', display: 'Playfair Display' }, // ✅ Added
 
   // Monospace
   { value: 'Courier New, monospace', category: 'Monospace', display: 'Courier New' },
@@ -83,6 +92,8 @@ export default function TextPropertiesPanel({
   { value: 'Lucida Console, monospace', category: 'Monospace', display: 'Lucida Console' },
   { value: 'Monaco, monospace', category: 'Monospace', display: 'Monaco' },
   { value: 'Source Code Pro, monospace', category: 'Monospace', display: 'Source Code Pro' },
+  { value: 'Inconsolata, monospace', category: 'Monospace', display: 'Inconsolata' }, // ✅ Added
+  { value: 'Menlo, monospace', category: 'Monospace', display: 'Menlo' }, // ✅ Added
 
   // Script / Cursive
   { value: 'Brush Script MT, cursive', category: 'Script', display: 'Brush Script MT' },
@@ -92,6 +103,8 @@ export default function TextPropertiesPanel({
   { value: 'Segoe Script, cursive', category: 'Script', display: 'Segoe Script' },
   { value: 'Lucida Handwriting, cursive', category: 'Script', display: 'Lucida Handwriting' },
   { value: 'Kristen ITC, cursive', category: 'Script', display: 'Kristen ITC' },
+  { value: 'Dancing Script, cursive', category: 'Script', display: 'Dancing Script' }, // ✅ Added
+  { value: 'Pacifico, cursive', category: 'Script', display: 'Pacifico' }, // ✅ Added
 
   // Display / Decorative
   { value: 'Impact, sans-serif', category: 'Display', display: 'Impact' },
@@ -106,8 +119,9 @@ export default function TextPropertiesPanel({
   { value: 'Vivaldi, cursive', category: 'Display', display: 'Vivaldi' },
   { value: 'Papyrus, sans-serif', category: 'Display', display: 'Papyrus' },
   { value: 'Snap ITC, sans-serif', category: 'Display', display: 'Snap ITC' },
+  { value: 'Bahnschrift, sans-serif', category: 'Display', display: 'Bahnschrift' }, // ✅ Added
+  { value: 'Oswald, sans-serif', category: 'Display', display: 'Oswald' }, // ✅ Added
 ];
-
 
   const groupedFonts = fontOptions.reduce((groups, font) => {
     if (!groups[font.category]) groups[font.category] = [];
