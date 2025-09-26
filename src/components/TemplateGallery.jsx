@@ -5,9 +5,9 @@ const templatesData = [
     category: "Real Estate",
     color: "bg-green-500",
     templates: [
-      { title: "New Property Listing (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/d1fae5/065f46?text=New+Property", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758711256%2Fnewsletter_1758711255646"},
-      { title: "Limited-Time Offer (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/a7f3d0/047857?text=Limited+Offer", link: "#" },
-      { title: "Monthly Newsletter (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/6ee7b7/059669?text=Monthly+Newsletter", link: "#" },
+      { title: "New Property Listing (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/d1fae5/065f46?text=New+Property", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758865040%2Fnewsletter_1758865041034"},
+      { title: "Limited-Time Offer (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/a7f3d0/047857?text=Limited+Offer", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758867006%2Fnewsletter_1758867007723" },
+      { title: "Monthly Newsletter (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/6ee7b7/059669?text=Monthly+Newsletter", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758868499%2Fnewsletter_1758868500757" },
       // { title: "Quick Offer Alert (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/dcfce7/4338ca?text=Quick+Offer", link: "#" },
       // { title: "Site Visit Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/bbf7d0/4338ca?text=Site+Visit", link: "#" },
     ],
@@ -177,8 +177,8 @@ export default function TemplateGallery() {
                       alt={template.title}
                       className="w-full h-64 object-cover rounded-t-lg transition-opacity duration-300 group-hover:opacity-50"
                     />
-                    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <p className="text-white text-lg font-semibold">Click to Edit Template</p>
+                    <div className="absolute inset-0  bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      {/* <p className="text-white text-lg font-semibold">Click to Edit Template</p> */}
                     </div>
                   </a>
                   <div className="p-4">
