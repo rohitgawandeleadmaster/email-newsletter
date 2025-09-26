@@ -1522,7 +1522,9 @@ export default function EmailNewsletterEditor() {
               </div>
 
               {/* Share Button */}
-              {!shareDisabled && (
+              {
+              // !shareDisabled && 
+              (
                 <button
                   onClick={async () => {
                     setIsSharing(true);
