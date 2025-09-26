@@ -28,14 +28,19 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import {
   Trash2,
-  Image,
+  Image as ImageIcon,
   Palette,
   Move,
   Layers,
   RotateCw,
   Upload,
   Link,
+  Eraser,
+  Wand2,
 } from "lucide-react";
+
+const isBrowser = () =>
+  typeof window !== "undefined" && typeof document !== "undefined";
 
 export default function ImagePropertiesPanel({
   element,
@@ -48,6 +53,19 @@ export default function ImagePropertiesPanel({
   const fileInputRef = useRef(null);
   const isImagePresent =
     element.content && element.content.startsWith("data:image");
+
+  // Hook up double-click event from canvas to open file picker
+  React.useEffect(() => {
+    if (!isBrowser()) return;
+    const handler = (ev) => {
+      // optionally check identity: if (ev.detail?.id !== element.id) return;
+      if (fileInputRef.current) {
+        fileInputRef.current.click();
+      }
+    };
+    window.addEventListener("open-image-upload", handler);
+    return () => window.removeEventListener("open-image-upload", handler);
+  }, [element?.id]);
 
   // ✅ Corrected handler to manage all border properties together
   const handleStyleChange = (key, value) => {
@@ -107,7 +125,7 @@ export default function ImagePropertiesPanel({
           <AccordionItem value="source" className="border-0">
             <AccordionTrigger className="px-4 py-3 bg-cyan-50/50 hover:bg-cyan-50 border-b">
               <div className="flex items-center gap-2">
-                <Image className="w-4 h-4 text-cyan-600" />
+                <ImageIcon className="w-4 h-4 text-cyan-600" />
                 <span className="font-medium">Image Source</span>
               </div>
             </AccordionTrigger>
@@ -180,6 +198,8 @@ export default function ImagePropertiesPanel({
               </div>
             </AccordionContent>
           </AccordionItem>
+
+          {/* Rest of the existing accordion items... */}
 
           {/* Dimensions & Layout Section */}
           <AccordionItem value="layout" className="border-0">

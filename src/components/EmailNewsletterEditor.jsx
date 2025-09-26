@@ -1,3 +1,7 @@
+
+
+
+
 import React, { useState, useRef, useEffect } from "react";
 import EditorSidebar from "./EditorSidebar";
 import EditorCanvas from "./EditorCanvas";
@@ -5,7 +9,7 @@ import { MousePointer, Eye, Save, Send, Download, Share2 } from "lucide-react";
 import domToImage from "dom-to-image-more";
 import jsPDF from "jspdf";
 import { exportToEmailHtml } from "./ExportToEmailHtml";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 
 // Add LZ-String compression library dynamically
@@ -203,9 +207,6 @@ export default function EmailNewsletterEditor() {
   ]);
 
   const [selectedElementId, setSelectedElementId] = useState(null);
-  const navigate = useNavigate(); // Initialize useNavigate
-  const [isSaving, setIsSaving] = useState(false);
-
   const [globalSettings, setGlobalSettings] = useState({
     backgroundColor: "#f5f5f5",
     maxWidth: "600px",
@@ -220,7 +221,12 @@ export default function EmailNewsletterEditor() {
   const [message, setMessage] = useState("");
   const [shareDisabled, setShareDisabled] = useState(false);
   const [isSharedDataLoaded, setIsSharedDataLoaded] = useState(false);
-
+  // Loading states
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingPng, setIsExportingPng] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [isExportingHtml, setIsExportingHtml] = useState(false);
   const dragItem = useRef(null);
   const canvasRef = useRef(null);
 
@@ -330,40 +336,39 @@ export default function EmailNewsletterEditor() {
     "tpl_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
   // inside component
- const saveTemplateToLocal = async () => {
-  try {
-    const thumb = await generateThumbnail(); // generate preview
-    const id = genId();
-    const record = {
-      id,
-      name: newsletterName || "Untitled",
-      elements,
-      globalSettings,
-      thumbnailUrl: thumb, // attach thumbnail here
-      updatedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    };
-    const list = loadTemplates();
-    saveTemplates([record, ...list]);
-    showMessage("Template saved locally.");
-    navigate("/saved"); // Navigate to the "/saved" route after successful save
-  } catch (e) {
-    showMessage("Failed to generate thumbnail, saved without preview.");
-    const id = genId();
-    const record = {
-      id,
-      name: newsletterName || "Untitled",
-      elements,
-      globalSettings,
-      thumbnailUrl: "",
-      updatedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    };
-    const list = loadTemplates();
-    saveTemplates([record, ...list]);
-    navigate("/saved"); // Navigate to the "/saved" route even on failure
-  }
-};
+  const saveTemplateToLocal = async () => {
+    try {
+      const thumb = await generateThumbnail(); // generate preview
+      const id = genId();
+      const record = {
+        id,
+        name: newsletterName || "Untitled",
+        elements,
+        globalSettings,
+        thumbnailUrl: thumb, // attach thumbnail here
+        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      const list = loadTemplates();
+      saveTemplates([record, ...list]);
+      showMessage("Template saved locally.");
+    } catch (e) {
+      showMessage("Failed to generate thumbnail, saved without preview.");
+      const id = genId();
+      const record = {
+        id,
+        name: newsletterName || "Untitled",
+        elements,
+        globalSettings,
+        thumbnailUrl: "",
+        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      const list = loadTemplates();
+      saveTemplates([record, ...list]);
+    }
+  };
+
   const showMessage = (text) => {
     setMessage(text);
     setTimeout(() => setMessage(""), 3000);
@@ -411,6 +416,13 @@ export default function EmailNewsletterEditor() {
           height: "auto",
           backgroundColor: "transparent",
           fontWeight: "400",
+          fontStyle: "normal",
+          textDecoration: "none",
+          textShadow: "none",
+          shadowOffsetX: "0px",
+          shadowOffsetY: "0px",
+          shadowBlurRadius: "0px",
+          shadowColor: "#000000",
         };
       case "header":
         return {
@@ -421,6 +433,13 @@ export default function EmailNewsletterEditor() {
           color: "#1a1a1a",
           height: "auto",
           backgroundColor: "transparent",
+          fontStyle: "normal",
+          textDecoration: "none",
+          textShadow: "none",
+          shadowOffsetX: "0px",
+          shadowOffsetY: "0px",
+          shadowBlurRadius: "0px",
+          shadowColor: "#000000",
         };
       case "image":
         return {
@@ -1315,177 +1334,262 @@ export default function EmailNewsletterEditor() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Header */}
-     <div className="bg-gradient-to-r from-white via-gray-50 to-white border-b-2 border-gray-300 px-6 py-4 flex items-center justify-between shadow-lg">
-      {/* Newsletter Name Input with Edit Button */}
-      <div className="flex-1 max-w-md relative group">
-        <input
-          type="text"
-          value={newsletterName}
-          onChange={(e) => setNewsletterName(e.target.value)}
-          className="text-xl font-bold bg-transparent border-none focus:outline-none text-gray-800 placeholder-gray-400 w-full pr-12 transition-all duration-300"
-          placeholder="Untitled Newsletter"
-        />
-        <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 w-0 group-focus-within:w-full transition-all duration-500 absolute bottom-0 left-0 rounded-full"></div>
+      <div className="bg-gradient-to-r from-white via-gray-50 to-white border-b-2 border-gray-300 px-6 py-4 flex items-center justify-between shadow-lg">
+        {/* Newsletter Name Input with Edit Button */}
+        <div className="flex-1 max-w-md relative group">
+          <input
+            type="text"
+            value={newsletterName}
+            onChange={(e) => setNewsletterName(e.target.value)}
+            className="text-xl font-bold bg-transparent border-none focus:outline-none text-gray-800 placeholder-gray-400 w-full pr-12 transition-all duration-300"
+            placeholder="Untitled Newsletter"
+          />
+          <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 w-0 group-focus-within:w-full transition-all duration-500 absolute bottom-0 left-0 rounded-full"></div>
 
-        {/* Edit Icon Button */}
-        <button
-          onClick={() =>
-            document
-              .querySelector('input[placeholder="Untitled Newsletter"]')
-              .focus()
-          }
-          className="absolute right-0 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-blue-500 transition-all duration-200 opacity-0 group-hover:opacity-100 hover:scale-110 rounded-full hover:bg-blue-50"
-          aria-label="Edit Newsletter Name"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0zM15.121 4.05L14 2.93l-1.414 1.414 1.121 1.121 1.414-1.414zM13.707 5.464L12.586 4.343 3.414 13.515l-.707 2.828 2.828-.707 9.172-9.172z" />
-          </svg>
-        </button>
-      </div>
-
-      <div className="flex items-center gap-3">
-        {/* Templates Button with new styling */}
-        <button
-          onClick={() => navigate("/templates")}
-          className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-indigo-200 bg-indigo-600 text-white hover:bg-indigo-700 hover:ring-indigo-300"
-        >
-          Template Gallery
-        </button>
-
-        {/* Save Template Button */}
-        <button
-          onClick={saveTemplateToLocal}
-          
-          disabled={isSaving}
-          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-indigo-200 ${
-            isSaving
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:ring-indigo-300'
-          }`}
-        >
-          {isSaving ? 'Saving...' : 'Save Template'}
-        </button>
-
-         {/* Save Template Button */}
-        <button
-         onClick={() => navigate("/saved")}
-          
-         
-          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-indigo-200 ${
-            isSaving
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-indigo-600 text-white hover:bg-indigo-700 hover:ring-indigo-300'
-          }`}
-        >
-          {isSaving ? 'opening...' : 'Saved Templates'}
-        </button>
-      </div>
-
-      {/* Right Side Controls */}
-      <div className="flex items-center">
-        {/* View Toggle Buttons */}
-        <div className="flex items-center bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl p-1.5 mr-6 shadow-inner">
+          {/* Edit Icon Button */}
           <button
-            onClick={() => setActiveView("editor")}
-            className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-              activeView === "editor"
-                ? "bg-white text-blue-600 shadow-md ring-2 ring-blue-100 transform scale-105"
-                : "text-gray-600 hover:text-gray-800 hover:bg-white/60"
-            }`}
+            onClick={() =>
+              document
+                .querySelector('input[placeholder="Untitled Newsletter"]')
+                .focus()
+            }
+            className="absolute right-0 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-blue-500 transition-all duration-200 opacity-0 group-hover:opacity-100 hover:scale-110 rounded-full hover:bg-blue-50"
+            aria-label="Edit Newsletter Name"
           >
-            <MousePointer className="w-4 h-4" />
-            Editor
-          </button>
-
-          <button
-            onClick={() => setActiveView("preview")}
-            className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-              activeView === "preview"
-                ? "bg-white text-blue-600 shadow-md ring-2 ring-blue-100 transform scale-105"
-                : "text-gray-600 hover:text-gray-800 hover:bg-white/60"
-            }`}
-          >
-            <Eye className="w-4 h-4" />
-            Preview
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0zM15.121 4.05L14 2.93l-1.414 1.414 1.121 1.121 1.414-1.414zM13.707 5.464L12.586 4.343 3.414 13.515l-.707 2.828 2.828-.707 9.172-9.172z" />
+            </svg>
           </button>
         </div>
 
-        {/* Export & Share Actions */}
-        {activeView === "preview" && (
-          <div className="flex items-center gap-3">
-            {/* Export Buttons */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={downloadAsPdf}
-                disabled={isExporting}
-                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-red-200 ${
-                  isExporting
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-red-600 text-white hover:bg-red-700 hover:ring-red-300"
-                }`}
+        {/* Navigation */}
+        <div className="flex items-center gap-4">
+          <header className="bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md rounded-xl p-3 border border-blue-100">
+            <nav className="flex items-center gap-3">
+              <Link
+                to="/templates"
+                className="px-4 py-2.5 rounded-lg text-sm font-semibold bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
-                <Download className="w-4 h-4" />
-                {isExporting ? "..." : "PDF"}
-              </button>
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                  />
+                </svg>
+                Templates
+              </Link>
+              <Link
+                to="/saved"
+                className="px-4 py-2.5 rounded-lg text-sm font-semibold bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+                  />
+                </svg>
+                Saved Templates
+              </Link>
+            </nav>
+          </header>
 
-              <button
-                onClick={downloadAsImage}
-                disabled={isExporting}
-                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-emerald-200 ${
-                  isExporting
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-emerald-600 text-white hover:bg-emerald-700 hover:ring-emerald-300"
-                }`}
-              >
-                <Download className="w-4 h-4" />
-                {isExporting ? "..." : "PNG"}
-              </button>
-            </div>
+          {/* Save Template */}
+          <button
+            onClick={async () => {
+              setIsSaving(true);
+              try {
+                await saveTemplateToLocal();
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+            disabled={isSaving}
+            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+              isSaving
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                : "bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 text-white hover:from-indigo-600 hover:via-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:scale-105 ring-2 ring-indigo-200 hover:ring-indigo-300"
+            }`}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+              />
+            </svg>
+            {isSaving ? "..." : "Save Template"}
+          </button>
+        </div>
 
-            {/* Share Button */}
-            {/* {!shareDisabled && (
-              <button
-                onClick={copyShareLink}
-                className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
-              >
-                <Share2 className="w-4 h-4" />
-                Share
-              </button>
-            )} */}
+        {/* Right Side Controls */}
+        <div className="flex items-center gap-4">
+          {/* View Toggle Buttons */}
+          <div className="flex items-center bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl p-1.5 shadow-inner">
             <button
-  onClick={copyShareLink}
-  className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
->
-  <Share2 className="w-4 h-4" />
-  Share
-</button>
-          </div>
-        )}
-      </div>
+              onClick={() => setActiveView("editor")}
+              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                activeView === "editor"
+                  ? "bg-white text-blue-600 shadow-md ring-2 ring-blue-100 transform scale-105"
+                  : "text-gray-600 hover:text-gray-800 hover:bg-white/60"
+              }`}
+            >
+              <MousePointer className="w-4 h-4" />
+              Editor
+            </button>
 
-      {/* Export HTML Button */}
-      <button
-        onClick={() => {
-          const html = exportToEmailHtml({
-            elements,
-            globalSettings,
-            newsletterName,
-          });
-          navigator.clipboard.writeText(html);
-          alert(
-            "Email HTML copied to clipboard. Paste into Gmail or EmailJS."
-          );
-        }}
-        className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-yellow-200 bg-yellow-600 text-white hover:bg-yellow-700 hover:ring-yellow-300"
-      >
-        Export HTML
-      </button>
-    </div>
+            <button
+              onClick={() => setActiveView("preview")}
+              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                activeView === "preview"
+                  ? "bg-white text-blue-600 shadow-md ring-2 ring-blue-100 transform scale-105"
+                  : "text-gray-600 hover:text-gray-800 hover:bg-white/60"
+              }`}
+            >
+              <Eye className="w-4 h-4" />
+              Preview
+            </button>
+          </div>
+
+          {/* Export & Share Actions */}
+          {activeView === "preview" && (
+            <div className="flex items-center gap-3">
+              {/* Export Buttons */}
+              <div className="flex items-center bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-1.5 shadow-inner gap-1">
+                <button
+                  onClick={async () => {
+                    setIsExportingPdf(true);
+                    try {
+                      await downloadAsPdf();
+                    } finally {
+                      setIsExportingPdf(false);
+                    }
+                  }}
+                  disabled={isExportingPdf}
+                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                    isExportingPdf
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-xl transform hover:scale-105"
+                  }`}
+                >
+                  <Download className="w-4 h-4" />
+                  {isExportingPdf ? "..." : "PDF"}
+                </button>
+
+                <button
+                  onClick={async () => {
+                    setIsExportingPng(true);
+                    try {
+                      await downloadAsImage();
+                    } finally {
+                      setIsExportingPng(false);
+                    }
+                  }}
+                  disabled={isExportingPng}
+                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                    isExportingPng
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transform hover:scale-105"
+                  }`}
+                >
+                  <Download className="w-4 h-4" />
+                  {isExportingPng ? "..." : "PNG"}
+                </button>
+              </div>
+
+              {/* Share Button */}
+              {!shareDisabled && (
+                <button
+                  onClick={async () => {
+                    setIsSharing(true);
+                    try {
+                      await copyShareLink();
+                    } finally {
+                      setIsSharing(false);
+                    }
+                  }}
+                  disabled={isSharing}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                    isSharing
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
+                  }`}
+                >
+                  <Share2 className="w-4 h-4" />
+                  {isSharing ? "..." : "Share"}
+                </button>
+              )}
+            
+ 
+            </div>
+          )}
+
+          {/* Export HTML Button */}
+          <button
+            onClick={async () => {
+              setIsExportingHtml(true);
+              try {
+                const html = exportToEmailHtml({
+                  elements,
+                  globalSettings,
+                  newsletterName,
+                });
+                await navigator.clipboard.writeText(html);
+                alert(
+                  "Email HTML copied to clipboard. Paste into Gmail or EmailJS."
+                );
+              } finally {
+                setIsExportingHtml(false);
+              }
+            }}
+            disabled={isExportingHtml}
+            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+              isExportingHtml
+                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                : "bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 text-white hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-600 shadow-lg hover:shadow-xl transform hover:scale-105 ring-2 ring-yellow-200 hover:ring-yellow-300"
+            }`}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+              />
+            </svg>
+            {isExportingHtml ? "..." : "Export HTML"}
+          </button>
+        </div>
+      </div>
 
       {/* Save Alert */}
       {showSaveAlert && (
@@ -1493,14 +1597,12 @@ export default function EmailNewsletterEditor() {
           Newsletter saved successfully!
         </div>
       )}
-
       {/* Message */}
       {message && (
         <div className="fixed top-20 right-6 z-50 bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded shadow-lg">
           {message}
         </div>
       )}
-
       {/* Main Editor */}
       <div className="flex flex-1 overflow-hidden">
         {activeView === "editor" && (
@@ -1514,7 +1616,6 @@ export default function EmailNewsletterEditor() {
             updateElementStyle={updateElementStyle}
             handleImageUpload={handleImageUpload}
             deleteElement={deleteElement}
-            
           />
         )}
 
@@ -1535,7 +1636,6 @@ export default function EmailNewsletterEditor() {
           handleImageUpload={handleImageUpload}
           addElement={addElement}
           preservePositions={true}
-          
         />
       </div>
     </div>
