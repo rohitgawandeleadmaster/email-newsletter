@@ -1189,6 +1189,8 @@ export default function ElementRenderer({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                transform: element.styles?.transform || "none",
+                transformOrigin: element.styles?.transformOrigin || "center center",
               }}
             >
               {isImagePresent ? (
