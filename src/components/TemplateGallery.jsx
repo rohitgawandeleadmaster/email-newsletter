@@ -6,8 +6,9 @@ const templatesData = [
     color: "bg-green-500",
     templates: [
       { title: "New Property Listing (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/d1fae5/065f46?text=New+Property", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758865040%2Fnewsletter_1758865041034"},
-      { title: "Limited-Time Offer (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/a7f3d0/047857?text=Limited+Offer", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758867006%2Fnewsletter_1758867007723" },
+      { title: "Limited-Time Offer (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/a7f3d0/047857?text=Limited+Offer", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1759128968%2Fnewsletter_1759128967504" },
       { title: "Monthly Newsletter (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/6ee7b7/059669?text=Monthly+Newsletter", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1758868499%2Fnewsletter_1758868500757" },
+       { title: "Monthly Newsletter (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/6ee7b7/059669?text=Monthly+Newsletter", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1759140278%2Fnewsletter_1759140278076" },
       // { title: "Quick Offer Alert (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/dcfce7/4338ca?text=Quick+Offer", link: "#" },
       // { title: "Site Visit Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/bbf7d0/4338ca?text=Site+Visit", link: "#" },
     ],
@@ -16,7 +17,7 @@ const templatesData = [
     category: "Financial Services",
     color: "bg-indigo-500",
     templates: [
-      { title: "Product Promo (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/c7d2fe/3730a3?text=Product+Promo", link: "#" },
+      { title: "Product Promo (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/c7d2fe/3730a3?text=Product+Promo", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1759127286%2Fnewsletter_1759127285080" },
       { title: "Educational Drip Campaign (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/a5b4fc/4338ca?text=Educational+Campaign", link: "#" },
       { title: "Payment Reminder (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/818cf8/4f46e5?text=Payment+Reminder", link: "#" },
       // { title: "KYC/Payment Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/e0e7ff/4338ca?text=KYC+Reminder", link: "#" },
