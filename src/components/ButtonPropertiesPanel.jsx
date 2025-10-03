@@ -156,6 +156,30 @@ export default function ButtonPropertiesPanel({
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Width (px)</Label>
+                      <Input
+                        type="number"
+                        value={parseInt(element.styles?.width) || 120}
+                        onChange={(e) =>
+                          handleStyleChange("width", `${e.target.value}px`)
+                        }
+                        className="transition-all duration-200"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Height (px)</Label>
+                      <Input
+                        type="number"
+                        value={parseInt(element.styles?.height) || 40}
+                        onChange={(e) =>
+                          handleStyleChange("height", `${e.target.value}px`)
+                        }
+                        className="transition-all duration-200"
+                      />
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Background</Label>
                     <div className="flex gap-2">

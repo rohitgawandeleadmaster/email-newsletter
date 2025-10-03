@@ -108,6 +108,56 @@ const buildSpacing = (styles, property) => {
   return `${top} ${right} ${bottom} ${left}`;
 };
 
+// Build per-corner radius string if any corner is set; else return styles.borderRadius or fallback
+const composeCornerRadius = (styles, fallback = "0px") => {
+  const tl = styles?.borderTopLeftRadius;
+  const tr = styles?.borderTopRightRadius;
+  const br = styles?.borderBottomRightRadius;
+  const bl = styles?.borderBottomLeftRadius;
+
+  const anyCorner = tl || tr || br || bl;
+  if (anyCorner) {
+    return `${tl || "0px"} ${tr || "0px"} ${br || "0px"} ${bl || "0px"}`;
+  }
+  return styles?.borderRadius || fallback;
+};
+
+// Return the final radius to apply given shapeType and styles
+const getShapeBorderRadius = (shapeType, styles) => {
+  switch ((shapeType || "rectangle").toLowerCase()) {
+    case "circle":
+    case "oval":
+      return "50%";
+    case "rounded-rectangle":
+      return composeCornerRadius(styles, "12px");
+    case "rectangle":
+      return composeCornerRadius(styles, "0px");
+    // Polygon shapes won't visually show rounded corners due to clipping
+    case "trapezoid":
+    case "star":
+    default:
+      return "0px";
+  }
+};
+
+// Only use polygon clip-path for polygon shapes
+const getShapeClipPath = (shapeType) => {
+  switch ((shapeType || "rectangle").toLowerCase()) {
+    case "trapezoid":
+      return "polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)";
+    case "star":
+      return "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
+    default:
+      return "none";
+  }
+};
+
+// Guard to decide if a shape is polygonal
+const isPolygonShape = (shapeType) => {
+  const t = (shapeType || "rectangle").toLowerCase();
+  return t === "trapezoid" || t === "star";
+};
+
 // Enhanced stripLayoutTransforms for better text consistency
 const stripLayoutTransforms = (node, preserveImageRotation = false) => {
   if (node && node.style) {
@@ -195,6 +245,75 @@ const createExportElement = (element, globalSettings) => {
   `;
 
   switch (type) {
+    case "shape": {
+      const shapeType = styles?.shapeType || "rectangle";
+      const shapeWidth = parseInt(styles?.width) || 200;
+      const shapeHeight = parseInt(styles?.height) || 200;
+
+      // Shape-specific styling with fixed corner radius
+      const isPoly = isPolygonShape(shapeType);
+      const shapeRadius = getShapeBorderRadius(shapeType, styles);
+      const shapeClip = getShapeClipPath(shapeType);
+
+      // Ensure wrapper has explicit px size
+      div.style.width = `${shapeWidth}px`;
+      div.style.height = `${shapeHeight}px`;
+      div.style.transform = "none";
+      div.style.transformOrigin = "top left";
+
+      const getFillStyle = () => {
+        const fillType = styles?.fillType || "solid";
+        switch (fillType) {
+          case "linear":
+            return `linear-gradient(${styles?.gradientDirection || "0deg"}, ${
+              styles?.gradientStartColor || "#3b82f6"
+            }, ${styles?.gradientEndColor || "#1e40af"})`;
+          case "radial":
+            return `radial-gradient(circle, ${
+              styles?.gradientStartColor || "#3b82f6"
+            }, ${styles?.gradientEndColor || "#1e40af"})`;
+          case "none":
+            return "transparent";
+          default:
+            return styles?.backgroundColor || "#3b82f6";
+        }
+      };
+
+      const container = document.createElement("div");
+      container.style.cssText = `
+        position: relative;
+        width: ${shapeWidth}px;
+        height: ${shapeHeight}px;
+        display: block;
+        margin: ${buildSpacing(styles, "margin") || "0"};
+        padding: ${buildSpacing(styles, "padding") || "0"};
+        box-sizing: border-box;
+        opacity: ${styles?.opacity || "1"};
+      `;
+
+      const shapeDiv = document.createElement("div");
+
+      shapeDiv.style.cssText = `
+        width: ${shapeWidth}px;
+        height: ${shapeHeight}px;
+        background: ${getFillStyle()};
+        ${isPoly ? "clip-path:" + shapeClip + ";" : "clip-path:none;"} 
+        ${
+          isPoly
+            ? "-webkit-clip-path:" + shapeClip + ";"
+            : "-webkit-clip-path:none;"
+        }
+        ${!isPoly ? "border-radius:" + shapeRadius + ";" : "border-radius:0px;"}
+        border: ${getBorderStyles(styles)};
+        box-shadow: ${styles?.boxShadow || "none"};
+        box-sizing: border-box;
+      `;
+
+      container.appendChild(shapeDiv);
+      stripLayoutTransforms(container);
+      div.appendChild(container);
+      break;
+    }
     case "text": {
       // Create a container that matches editor exactly
       const textContainer = document.createElement("div");
@@ -207,7 +326,7 @@ const createExportElement = (element, globalSettings) => {
         margin: 0;
         padding: ${buildSpacing(styles, "padding") || "0"};
         background-color: ${styles.backgroundColor || "transparent"};
-        border-radius: ${styles.borderRadius || "0"};
+        border-radius: ${composeCornerRadius(styles, "0")};
         border: ${getBorderStyles(styles)};
         box-shadow: ${styles.boxShadow || "none"};
         box-sizing: border-box;
@@ -278,7 +397,7 @@ const createExportElement = (element, globalSettings) => {
         margin: 0;
         padding: ${buildSpacing(styles, "padding") || "0"};
         background-color: ${styles.backgroundColor || "transparent"};
-        border-radius: ${styles.borderRadius || "0"};
+        border-radius: ${composeCornerRadius(styles, "0")};
         border: ${getBorderStyles(styles)};
         box-shadow: ${styles.boxShadow || "none"};
         box-sizing: border-box;
@@ -339,37 +458,49 @@ const createExportElement = (element, globalSettings) => {
 
     case "image": {
       const imgBox = document.createElement("div");
+      const shapeType = styles?.shapeType || "rectangle";
+      const isPoly = isPolygonShape(shapeType);
+      const imgRadius = getShapeBorderRadius(shapeType, styles);
+      const imgClip = getShapeClipPath(shapeType);
+
       imgBox.style.cssText = `
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden; /* critical */
-    background: transparent;
-    border-radius: ${styles.borderRadius || "0"};
-    border: ${getBorderStyles(styles)};
-    box-shadow: ${styles.boxShadow || "none"};
-    opacity: ${styles.opacity || "1"};
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  `;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        z-index: ${styles.zIndex || 1};
+        background: transparent;
+        border: ${getBorderStyles(styles)};
+        box-shadow: ${styles.boxShadow || "none"};
+        opacity: ${styles.opacity || "1"};
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        ${isPoly ? "clip-path:" + imgClip + ";" : "clip-path:none;"}
+        ${
+          isPoly
+            ? "-webkit-clip-path:" + imgClip + ";"
+            : "-webkit-clip-path:none;"
+        }
+        ${!isPoly ? "border-radius:" + imgRadius + ";" : "border-radius:0px;"}
+      `;
 
       const img = document.createElement("img");
       img.src = content || "";
       img.alt = "Newsletter Image";
       img.style.cssText = `
-    width: 100%;
-    height: 100%;
-    object-fit: ${styles.objectFit || "cover"};
-    display: block;
-    margin: 0;
-    padding: 0;
-    border-radius: 0;
-    box-sizing: border-box;
-  `;
+        width: 100%;
+        height: 100%;
+        object-fit: ${styles.objectFit || "cover"};
+        display: block;
+        margin: 0;
+        padding: 0;
+        border-radius: 0;
+        box-sizing: border-box;
+      `;
 
       stripLayoutTransforms(img);
       stripLayoutTransforms(imgBox);
@@ -379,6 +510,8 @@ const createExportElement = (element, globalSettings) => {
     }
 
     case "button": {
+      div.style.width = styles.width || "200px";
+      div.style.height = styles.height || "50px";
       // Create outer container that matches the element dimensions
       const outerContainer = document.createElement("div");
       outerContainer.style.cssText = `
@@ -392,13 +525,13 @@ const createExportElement = (element, globalSettings) => {
         box-sizing: border-box;
       `;
 
-      // Create button container with exact flex alignment
+      // Create button container with flex alignment
       const buttonContainer = document.createElement("div");
       buttonContainer.style.cssText = `
         width: 100%;
         height: 100%;
         display: flex;
-        align-items: center;
+        align-items: center;  
         justify-content: ${
           styles.textAlign === "left" || !styles.textAlign
             ? "flex-start"
@@ -408,48 +541,34 @@ const createExportElement = (element, globalSettings) => {
         };
         padding: 0;
         margin: 0;
-        box-sizing: border-box;
         background-color: transparent;
+        box-sizing: border-box;
       `;
 
-      // Create the actual button with all styling
+      // Create the actual button
       const button = document.createElement("a");
       button.href = link || "#";
       button.textContent = content || "Button";
       button.style.cssText = `
         padding: ${buildSpacing(styles, "padding") || "12px 24px"};
-        text-decoration: none;
         display: inline-block;
         text-align: center;
-        border-radius: ${styles.borderRadius || "6px"};
+        border-radius: ${composeCornerRadius(styles, "6px")};
         background-color: ${styles.backgroundColor || "#007bff"};
         color: ${styles.color || "#fff"};
         border: ${getBorderStyles(styles)};
         font-size: ${styles.fontSize || "16px"};
         font-weight: ${normalizeWeight(styles.fontWeight) || "400"};
         font-style: ${styles.fontStyle || "normal"};
-        text-shadow: ${styles.textShadow || "none"};
         font-family: ${
           styles.fontFamily || globalSettings?.fontFamily || "Arial, sans-serif"
         };
         box-shadow: ${styles.boxShadow || "none"};
         opacity: ${styles.opacity || "1"};
-        margin: 0;
-        min-width: ${styles.minWidth || "100px"};
-        width: ${styles.width === "100%" ? "100%" : "auto"};
+        width: 100%;
+        height: 100%;
         box-sizing: border-box;
-        letter-spacing: ${styles.letterSpacing || "normal"};
-        word-spacing: ${styles.wordSpacing || "normal"};
-        text-transform: ${styles.textTransform || "none"};
-        line-height: ${styles.lineHeight || "1.4"};
-        vertical-align: baseline;
-        text-rendering: geometricPrecision;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        white-space: nowrap;
-        overflow-wrap: break-word;
       `;
-
       stripLayoutTransforms(button);
       stripLayoutTransforms(buttonContainer);
       stripLayoutTransforms(outerContainer);
@@ -538,7 +657,7 @@ const createExportElement = (element, globalSettings) => {
         };
         padding: ${buildSpacing(styles, "padding") || "16px"};
         background-color: ${styles.backgroundColor || "transparent"};
-        border-radius: ${styles.borderRadius || "0"};
+        border-radius: ${composeCornerRadius(styles, "0")};
         border: ${getBorderStyles(styles)};
         box-shadow: ${styles.boxShadow || "none"};
         box-sizing: border-box;
@@ -579,7 +698,7 @@ const createExportElement = (element, globalSettings) => {
         width: 100%;
         background-color: ${styles.backgroundColor || "#f9f9f9"};
         border: ${getBorderStyles(styles)};
-        border-radius: ${styles.borderRadius || "8px"};
+        border-radius: ${composeCornerRadius(styles, "8px")};
         padding: ${buildSpacing(styles, "padding") || "20px"};
         margin: ${buildSpacing(styles, "margin") || "20px 0"};
         box-shadow: ${styles.boxShadow || "none"};
@@ -742,11 +861,8 @@ const ResizableElementWrapper = ({
     updateElement(element.id, {
       styles: {
         ...element.styles,
-        width: `${newWidth}px`,
-        height:
-          element.type === "divider"
-            ? element.styles?.height
-            : `${newHeight}px`,
+        width: `${Math.round(newWidth)}px`,
+        height: `${Math.round(newHeight)}px`,
       },
     });
   };
@@ -831,13 +947,13 @@ const ResizableElementWrapper = ({
         left: element.styles?.left || "20px",
         top: element.styles?.top || "20px",
         width: element.styles?.width || "auto",
-        height: element.styles?.height || "auto",
+        height: element.styles?.height || "50px",
         zIndex: selected ? 10 : 1,
       }
     : {
         position: "relative",
         width: element.styles?.width || "100%",
-        height: element.styles?.height || "auto",
+        height: element.styles?.height || "50px",
         margin: element.styles?.margin || "0",
         padding: element.styles?.padding || "0",
       };
@@ -997,7 +1113,7 @@ export default function ElementRenderer({
                 styles?.borderWidth && styles?.borderColor
                   ? `${styles.borderWidth} solid ${styles.borderColor}`
                   : styles?.border || "none",
-              borderRadius: styles?.borderRadius || "8px",
+              borderRadius: composeCornerRadius(styles, "8px"),
               padding: buildSpacing(styles, "padding") || "20px",
               margin: styles?.margin || "20px 0",
               boxShadow: styles?.boxShadow || "none",
@@ -1038,6 +1154,122 @@ export default function ElementRenderer({
           </div>
         );
 
+      case "shape": {
+        const isEditable = activeView === "editor";
+        const shapeType = styles?.shapeType || "rectangle";
+
+        // Shape-specific styling with fixed corner radius
+        const isPoly = isPolygonShape(shapeType);
+        const shapeRadius = getShapeBorderRadius(shapeType, styles);
+        const shapeClip = getShapeClipPath(shapeType);
+
+        // Generate fill styles
+        const getFillStyle = () => {
+          const fillType = styles?.fillType || "solid";
+
+          switch (fillType) {
+            case "linear":
+              const direction = styles?.gradientDirection || "0deg";
+              const startColor = styles?.gradientStartColor || "#3b82f6";
+              const endColor = styles?.gradientEndColor || "#1e40af";
+              return `linear-gradient(${direction}, ${startColor}, ${endColor})`;
+
+            case "radial":
+              const centerColor = styles?.gradientStartColor || "#3b82f6";
+              const edgeColor = styles?.gradientEndColor || "#1e40af";
+              return `radial-gradient(circle, ${centerColor}, ${edgeColor})`;
+
+            case "none":
+              return "transparent";
+
+            default:
+              return styles?.backgroundColor || "#3b82f6";
+          }
+        };
+
+        const shapeWidth = parseInt(styles?.width) || 200;
+        const shapeHeight = parseInt(styles?.height) || 200;
+
+        return (
+          <EditableWrapper
+            element={element}
+            isEditable={isEditable}
+            tooltip="Click to edit shape"
+          >
+            <div
+              className={`shape-element ${editorHelpers}`}
+              style={{
+                position: "relative",
+                width: `${shapeWidth}px`,
+                height: `${shapeHeight}px`,
+                boxSizing: "border-box",
+                display: "flex",
+                alignItems:
+                  styles?.verticalAlign === "bottom"
+                    ? "flex-end"
+                    : styles?.verticalAlign === "center"
+                    ? "center"
+                    : "flex-start",
+                justifyContent:
+                  styles?.horizontalAlign === "right"
+                    ? "flex-end"
+                    : styles?.horizontalAlign === "center"
+                    ? "center"
+                    : "flex-start",
+                margin: `${styles?.marginTop || "0px"} ${
+                  styles?.marginRight || "0px"
+                } ${styles?.marginBottom || "0px"} ${
+                  styles?.marginLeft || "0px"
+                }`,
+                padding: `${styles?.paddingTop || "0px"} ${
+                  styles?.paddingRight || "0px"
+                } ${styles?.paddingBottom || "0px"} ${
+                  styles?.paddingLeft || "0px"
+                }`,
+              }}
+            >
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  background: getFillStyle(),
+                  // Important: only set clipPath for polygon shapes
+                  clipPath: isPoly ? shapeClip : "none",
+                  WebkitClipPath: isPoly ? shapeClip : "none",
+                  // Important: for non-polygon shapes, use borderRadius so corners work
+                  borderRadius: isPoly ? "0px" : shapeRadius,
+                  border:
+                    styles?.borderWidth && styles?.borderColor
+                      ? `${styles.borderWidth} ${
+                          styles.borderStyle || "solid"
+                        } ${styles.borderColor}`
+                      : "none",
+                  boxShadow: styles?.boxShadow || "none",
+                  opacity: styles?.opacity || "1",
+                  transform: styles?.transform || "none",
+                  boxSizing: "border-box",
+                  alignSelf:
+                    styles?.verticalAlign === "bottom"
+                      ? "flex-end"
+                      : styles?.verticalAlign === "center"
+                      ? "center"
+                      : "flex-start",
+                  justifySelf:
+                    styles?.horizontalAlign === "right"
+                      ? "flex-end"
+                      : styles?.horizontalAlign === "center"
+                      ? "center"
+                      : "flex-start",
+                }}
+              />
+
+              {isEditable && (
+                <div className="absolute inset-0 pointer-events-none border border-dashed border-blue-300 opacity-50" />
+              )}
+            </div>
+          </EditableWrapper>
+        );
+      }
       case "text":
         return (
           <EditableWrapper
@@ -1055,7 +1287,7 @@ export default function ElementRenderer({
                 ...contentStyles,
                 backgroundColor: contentStyles.backgroundColor,
                 color: contentStyles.color,
-                borderRadius: contentStyles.borderRadius,
+                borderRadius: composeCornerRadius(contentStyles, "0"),
                 border: contentStyles.border,
                 padding: buildSpacing(contentStyles, "padding"),
                 fontSize: contentStyles.fontSize,
@@ -1110,7 +1342,7 @@ export default function ElementRenderer({
                 ...contentStyles,
                 backgroundColor: contentStyles.backgroundColor,
                 color: contentStyles.color,
-                borderRadius: contentStyles.borderRadius,
+                borderRadius: composeCornerRadius(contentStyles, "0"),
                 border: contentStyles.border,
                 padding: buildSpacing(contentStyles, "padding"),
                 fontSize: contentStyles.fontSize,
@@ -1162,7 +1394,13 @@ export default function ElementRenderer({
 
         const boxWidth = styles?.width || "300px";
         const boxHeight = styles?.height || "200px";
-        const fit = styles?.objectFit || "cover"; // contain | cover | fill | none | scale-down
+        const fit = styles?.objectFit || "cover";
+        const shapeType = styles?.shapeType || "rectangle";
+
+        // Get shape-specific styling with fixed corner radius
+        const isPoly = isPolygonShape(shapeType);
+        const imgRadius = getShapeBorderRadius(shapeType, styles);
+        const imgClip = getShapeClipPath(shapeType);
 
         return (
           <EditableWrapper
@@ -1182,15 +1420,20 @@ export default function ElementRenderer({
                   styles?.borderWidth && styles?.borderColor
                     ? `${styles.borderWidth} solid ${styles.borderColor}`
                     : styles?.border || "none",
-                borderRadius: styles?.borderRadius || 0,
                 boxShadow: styles?.boxShadow || "none",
                 opacity: styles?.opacity ?? 1,
-                overflow: "hidden", // critical
+                overflow: "hidden",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 transform: element.styles?.transform || "none",
-                transformOrigin: element.styles?.transformOrigin || "center center",
+                transformOrigin:
+                  element.styles?.transformOrigin || "center center",
+                // Important: only polygon shapes should use clip-path
+                clipPath: isPoly ? imgClip : "none",
+                WebkitClipPath: isPoly ? imgClip : "none",
+                // Important: for non-polygon shapes, use borderRadius so corners round
+                borderRadius: isPoly ? "0px" : imgRadius,
               }}
             >
               {isImagePresent ? (
@@ -1251,7 +1494,7 @@ export default function ElementRenderer({
                     ? "flex-end"
                     : "center",
                 padding: "0",
-                margin: buildSpacing(contentStyles, "margin") || "0",
+                margin: "0",
                 backgroundColor: "transparent",
                 boxSizing: "border-box",
               }}
@@ -1262,9 +1505,11 @@ export default function ElementRenderer({
                   padding:
                     buildSpacing(contentStyles, "padding") || "12px 24px",
                   textDecoration: "none",
-                  display: "inline-block",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   textAlign: "center",
-                  borderRadius: contentStyles.borderRadius || "6px",
+                  borderRadius: composeCornerRadius(contentStyles, "6px"),
                   backgroundColor: contentStyles.backgroundColor || "#007bff",
                   color: contentStyles.color || "#fff",
                   border:
@@ -1282,8 +1527,8 @@ export default function ElementRenderer({
                   boxShadow: contentStyles.boxShadow || "none",
                   opacity: contentStyles.opacity || "1",
                   cursor: activeView === "preview" ? "pointer" : "default",
-                  minWidth: contentStyles.minWidth || "100px",
-                  width: contentStyles.width === "100%" ? "100%" : "auto",
+                  width: "100%",
+                  height: "100%",
                   margin: "0",
                   boxSizing: "border-box",
                   letterSpacing: contentStyles.letterSpacing || "normal",
@@ -1317,7 +1562,6 @@ export default function ElementRenderer({
             </div>
           </EditableWrapper>
         );
-
       case "divider":
         return (
           <EditableWrapper
@@ -1353,7 +1597,7 @@ export default function ElementRenderer({
                   } ${
                     styles?.borderColor || styles?.backgroundColor || "#d1d5db"
                   }`,
-                  height: "1px",
+                  height: "20px",
                 }}
               />
               {content && (
@@ -1396,7 +1640,7 @@ export default function ElementRenderer({
                     : "center",
                 padding: buildSpacing(contentStyles, "padding") || "16px",
                 backgroundColor: contentStyles.backgroundColor,
-                borderRadius: contentStyles.borderRadius,
+                borderRadius: composeCornerRadius(contentStyles, "0"),
                 border: contentStyles.border,
                 boxShadow: contentStyles.boxShadow,
               }}
@@ -1480,4 +1724,8 @@ export {
   normalizeWeight,
   getBorderStyles,
   buildSpacing,
+  getShapeClipPath,
+  getShapeBorderRadius,
+  composeCornerRadius,
+  isPolygonShape,
 };

@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useRef, useEffect } from "react";
 import EditorSidebar from "./EditorSidebar";
 import EditorCanvas from "./EditorCanvas";
@@ -149,8 +145,58 @@ const extractRotation = (transform) => {
 // Helper to extract scale from transform string
 const extractScale = (transform) => {
   if (!transform || transform === "none") return 1;
-  const match = transform.match(/scale\(([\d.]+)\)/i);
+  const match = transform.match(/scale\(([d.]+)\)/i);
   return match ? parseFloat(match[1]) : 1;
+};
+
+// Build per-corner radius string if any corner is set; else return styles.borderRadius or fallback
+const composeCornerRadius = (styles, fallback = "0px") => {
+  const tl = styles?.borderTopLeftRadius;
+  const tr = styles?.borderTopRightRadius;
+  const br = styles?.borderBottomRightRadius;
+  const bl = styles?.borderBottomLeftRadius;
+
+  const anyCorner = tl || tr || br || bl;
+  if (anyCorner) {
+    return `${tl || "0px"} ${tr || "0px"} ${br || "0px"} ${bl || "0px"}`;
+  }
+  return styles?.borderRadius || fallback;
+};
+
+// Return the final radius to apply given shapeType and styles
+const getShapeBorderRadius = (shapeType, styles) => {
+  switch ((shapeType || "rectangle").toLowerCase()) {
+    case "circle":
+    case "oval":
+      return "50%";
+    case "rounded-rectangle":
+      return composeCornerRadius(styles, "12px");
+    case "rectangle":
+      return composeCornerRadius(styles, "0px");
+    // Polygon shapes won't visually show rounded corners due to clipping
+    case "trapezoid":
+    case "star":
+    default:
+      return "0px";
+  }
+};
+
+// Only use polygon clip-path for polygon shapes
+const getShapeClipPath = (shapeType) => {
+  switch ((shapeType || "rectangle").toLowerCase()) {
+    case "trapezoid":
+      return "polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)";
+    case "star":
+      return "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
+    default:
+      return "none";
+  }
+};
+
+// Guard to decide if a shape is polygonal
+const isPolygonShape = (shapeType) => {
+  const t = (shapeType || "rectangle").toLowerCase();
+  return t === "trapezoid" || t === "star";
 };
 
 // Helper to strip layout-affecting transforms (preserve image rotation)
@@ -313,7 +359,7 @@ export default function EmailNewsletterEditor() {
       } else {
         showMessage("Template loaded.");
       }
-      // Clear state so back/forward doesn’t re-trigger
+      // Clear state so back/forward doesn't re-trigger
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [location]);
@@ -393,6 +439,8 @@ export default function EmailNewsletterEditor() {
         return "";
       case "social":
         return "";
+      case "shape":
+        return "";
       default:
         return "";
     }
@@ -407,6 +455,33 @@ export default function EmailNewsletterEditor() {
     };
 
     switch (type) {
+      case "shape":
+        return {
+          ...base,
+          width: "200px",
+          height: "200px",
+          backgroundColor: "#3b82f6",
+          shapeType: "rectangle",
+          fillType: "solid",
+          borderWidth: "0px",
+          borderStyle: "solid",
+          borderColor: "#000000",
+          opacity: "1",
+          boxShadow: "none",
+          transform: "none",
+          borderTopLeftRadius: "0px",
+          borderTopRightRadius: "0px",
+          borderBottomLeftRadius: "0px",
+          borderBottomRightRadius: "0px",
+          marginTop: "0px",
+          marginRight: "0px",
+          marginBottom: "0px",
+          marginLeft: "0px",
+          paddingTop: "0px",
+          paddingRight: "0px",
+          paddingBottom: "0px",
+          paddingLeft: "0px",
+        };
       case "text":
         return {
           ...base,
@@ -447,6 +522,7 @@ export default function EmailNewsletterEditor() {
           textAlign: "center",
           height: "200px",
           width: "300px",
+          shapeType: "rectangle",
         };
       case "button":
         return {
@@ -741,8 +817,10 @@ export default function EmailNewsletterEditor() {
           elementDiv.style.position = "absolute";
           elementDiv.style.left = element.styles.left || "0px";
           elementDiv.style.top = element.styles.top || "0px";
-          elementDiv.style.width = element.styles.width || "auto";
-          elementDiv.style.height = element.styles.height || "auto";
+          if (element.styles?.width)
+            elementDiv.style.width = element.styles.width;
+          if (element.styles?.height)
+            elementDiv.style.height = element.styles.height;
         }
         exportContainer.appendChild(elementDiv);
       }
@@ -801,6 +879,95 @@ export default function EmailNewsletterEditor() {
     stripLayoutTransforms(div);
 
     switch (element.type) {
+      case "shape": {
+        const shapeType = styles?.shapeType || "rectangle";
+        const shapeWidth = parseInt(styles?.width) || 200;
+        const shapeHeight = parseInt(styles?.height) || 200;
+
+        // Shape-specific styling with fixed corner radius
+        const isPoly = isPolygonShape(shapeType);
+        const shapeRadius = getShapeBorderRadius(shapeType, styles);
+        const shapeClip = getShapeClipPath(shapeType);
+
+        // Ensure the wrapper itself has pixel size and no transform for export
+        div.style.width = `${shapeWidth}px`;
+        div.style.height = `${shapeHeight}px`;
+        div.style.background = "transparent";
+        div.style.boxSizing = "border-box";
+        div.style.transform = "none";
+        div.style.transformOrigin = "top left";
+
+        // Fill generator (export scope)
+        const getFillStyle = () => {
+          const fillType = styles?.fillType || "solid";
+          switch (fillType) {
+            case "linear":
+              return `linear-gradient(${styles?.gradientDirection || "0deg"}, ${
+                styles?.gradientStartColor || "#3b82f6"
+              }, ${styles?.gradientEndColor || "#1e40af"})`;
+            case "radial":
+              return `radial-gradient(circle, ${
+                styles?.gradientStartColor || "#3b82f6"
+              }, ${styles?.gradientEndColor || "#1e40af"})`;
+            case "none":
+              return "transparent";
+            default:
+              return styles?.backgroundColor || "#3b82f6";
+          }
+        };
+
+        // Border generator (export scope)
+        const getBorderStyles = (s) => {
+          if (parseInt(s?.borderWidth) > 0) {
+            return `${s.borderWidth} ${s.borderStyle || "solid"} ${
+              s.borderColor || "#000"
+            }`;
+          }
+          return "none";
+        };
+
+        // Container (kept simple for dom-to-image)
+        const container = document.createElement("div");
+        container.style.cssText = `
+          position: relative;
+          width: ${shapeWidth}px;
+          height: ${shapeHeight}px;
+          display: block;
+          margin: ${buildSpacing(styles, "margin") || "0"};
+          padding: ${buildSpacing(styles, "padding") || "0"};
+          box-sizing: border-box;
+          opacity: ${styles?.opacity || "1"};
+        `;
+
+        // Shape div with proper shape support
+        const shapeDiv = document.createElement("div");
+
+        shapeDiv.style.cssText = `
+          width: ${shapeWidth}px;
+          height: ${shapeHeight}px;
+          background: ${getFillStyle()};
+          ${isPoly ? "clip-path:" + shapeClip + ";" : "clip-path:none;"} 
+          ${
+            isPoly
+              ? "-webkit-clip-path:" + shapeClip + ";"
+              : "-webkit-clip-path:none;"
+          }
+          ${
+            !isPoly
+              ? "border-radius:" + shapeRadius + ";"
+              : "border-radius:0px;"
+          }
+          border: ${getBorderStyles(styles)};
+          box-shadow: ${styles?.boxShadow || "none"};
+          box-sizing: border-box;
+        `;
+
+        container.appendChild(shapeDiv);
+        stripLayoutTransforms(container);
+        div.appendChild(container);
+        break;
+      }
+
       case "header":
         const header = document.createElement("h2");
         header.textContent = element.content || "Header";
@@ -821,7 +988,7 @@ export default function EmailNewsletterEditor() {
           height: ${styles.height || "auto"};
           background-color: ${styles.backgroundColor || "transparent"};
           display: block;
-          border-radius: ${styles.borderRadius || "0"};
+          border-radius: ${composeCornerRadius(styles, "0")};
           border: ${getBorderStyles(styles)};
           box-shadow: ${styles.boxShadow || "none"};
           opacity: ${styles.opacity || "1"};
@@ -864,7 +1031,7 @@ export default function EmailNewsletterEditor() {
           height: ${styles.height || "auto"};
           background-color: ${styles.backgroundColor || "transparent"};
           display: block;
-          border-radius: ${styles.borderRadius || "0"};
+          border-radius: ${composeCornerRadius(styles, "0")};
           border: ${getBorderStyles(styles)};
           box-shadow: ${styles.boxShadow || "none"};
           opacity: ${styles.opacity || "1"};
@@ -900,7 +1067,7 @@ export default function EmailNewsletterEditor() {
           padding: ${buildSpacing(styles, "padding") || "12px 24px"};
           margin: ${buildSpacing(styles, "margin") || "0"};
           text-decoration: none;
-          border-radius: ${styles.borderRadius || "6px"};
+          border-radius: ${composeCornerRadius(styles, "6px")};
           font-size: ${styles.fontSize || "16px"};
           font-weight: ${buttonWeight};
           font-variation-settings: "wght" ${buttonWeight};
@@ -948,27 +1115,49 @@ export default function EmailNewsletterEditor() {
         pushLinkRect(buttonLink.href, leftPx, topPx, widthPx, heightPx);
         break;
 
-      case "image":
+      case "image": {
         if (
           element.content &&
           (element.content.startsWith("data:") ||
             element.content.startsWith("http"))
         ) {
+          const imgContainer = document.createElement("div");
           const img = document.createElement("img");
-          img.src = element.content;
-          img.style.cssText = `
+
+          const shapeType = styles?.shapeType || "rectangle";
+          const isPoly = isPolygonShape(shapeType);
+          const imgRadius = getShapeBorderRadius(shapeType, styles);
+          const imgClip = getShapeClipPath(shapeType);
+
+          imgContainer.style.cssText = `
             width: 100%;
             height: 100%;
-            object-fit: ${styles.objectFit || "cover"};
+            overflow: hidden;
             border: ${getBorderStyles(styles)};
-            border-radius: ${styles.borderRadius || "0"};
-            background: transparent;
-            display: block;
             box-shadow: ${styles.boxShadow || "none"};
             opacity: ${styles.opacity || "1"};
             padding: ${buildSpacing(styles, "padding") || "0"};
             margin: ${buildSpacing(styles, "margin") || "0"};
             box-sizing: border-box;
+            ${isPoly ? "clip-path:" + imgClip + ";" : "clip-path:none;"}
+            ${
+              isPoly
+                ? "-webkit-clip-path:" + imgClip + ";"
+                : "-webkit-clip-path:none;"
+            }
+            ${
+              !isPoly
+                ? "border-radius:" + imgRadius + ";"
+                : "border-radius:0px;"
+            }
+          `;
+
+          img.src = element.content;
+          img.style.cssText = `
+            width: 100%;
+            height: 100%;
+            object-fit: ${styles.objectFit || "cover"};
+            display: block;
             filter: ${styles.filter || "none"};
             backdrop-filter: ${styles.backdropFilter || "none"};
             ${
@@ -980,8 +1169,9 @@ export default function EmailNewsletterEditor() {
             }
             transform-origin: center center;
           `;
-          // Do NOT strip transforms for images - preserve rotation
-          div.appendChild(img);
+
+          imgContainer.appendChild(img);
+          div.appendChild(imgContainer);
         } else {
           div.style.backgroundColor = "#f5f5f5";
           div.style.border = "1px dashed #ccc";
@@ -990,7 +1180,7 @@ export default function EmailNewsletterEditor() {
           div.style.justifyContent = "center";
           div.style.color = "#999";
           div.style.fontSize = "14px";
-          div.style.borderRadius = styles.borderRadius || "0";
+          div.style.borderRadius = composeCornerRadius(styles, "0");
           div.style.boxShadow = styles.boxShadow || "none";
           div.style.fontFamily =
             styles.fontFamily ||
@@ -999,10 +1189,11 @@ export default function EmailNewsletterEditor() {
           div.textContent = "Image Placeholder";
         }
         break;
+      }
 
       case "divider":
         div.style.backgroundColor = styles.backgroundColor || "#d1d5db";
-        div.style.borderRadius = styles.borderRadius || "0";
+        div.style.borderRadius = composeCornerRadius(styles, "0");
         div.style.boxShadow = styles.boxShadow || "none";
         div.style.height = styles.height || "2px";
         div.style.width = "100%";
@@ -1039,7 +1230,7 @@ export default function EmailNewsletterEditor() {
             font-variation-settings: "wght" ${dividerWeight};
             color: ${styles.color || "#666"};
             font-style: ${styles.fontStyle || "normal"};
-            border-radius: ${styles.borderRadius || "0"};
+            border-radius: ${composeCornerRadius(styles, "0")};
             font-family: ${
               styles.fontFamily ||
               globalSettings.fontFamily ||
@@ -1060,7 +1251,7 @@ export default function EmailNewsletterEditor() {
           styles.backgroundColor && styles.backgroundColor !== "transparent"
             ? styles.backgroundColor
             : "transparent";
-        div.style.borderRadius = styles.borderRadius || "0";
+        div.style.borderRadius = composeCornerRadius(styles, "0");
         div.style.boxShadow = styles.boxShadow || "none";
         div.style.opacity = styles.opacity || "1";
         div.style.border = getBorderStyles(styles);
@@ -1175,7 +1366,7 @@ export default function EmailNewsletterEditor() {
       case "section":
         div.style.backgroundColor = styles.backgroundColor || "#f9f9f9";
         div.style.border = getBorderStyles(styles) || "1px solid #e5e5e5";
-        div.style.borderRadius = styles.borderRadius || "8px";
+        div.style.borderRadius = composeCornerRadius(styles, "8px");
         div.style.padding = buildSpacing(styles, "padding") || "20px";
         div.style.margin = buildSpacing(styles, "margin") || "20px 0";
         div.style.boxShadow = styles.boxShadow || "none";
@@ -1522,9 +1713,7 @@ export default function EmailNewsletterEditor() {
               </div>
 
               {/* Share Button */}
-              {
-              // !shareDisabled && 
-              (
+              {!shareDisabled && (
                 <button
                   onClick={async () => {
                     setIsSharing(true);
@@ -1545,8 +1734,6 @@ export default function EmailNewsletterEditor() {
                   {isSharing ? "..." : "Share"}
                 </button>
               )}
-            
- 
             </div>
           )}
 

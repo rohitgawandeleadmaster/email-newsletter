@@ -23,6 +23,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
+import { Square } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,7 @@ import ImagePropertiesPanel from "./ImagePropertiesPanel";
 import ButtonPropertiesPanel from "./ButtonPropertiesPanel";
 import DividerPropertiesPanel from "./DividerPropertiesPanel";
 import SocialPropertiesPanel from "./SocialPropertiesPanel";
+import ShapePropertiesPanel from "./ShapePropertiesPanel";
 
 export default function EditorSidebar({
   globalSettings,
@@ -48,7 +51,6 @@ export default function EditorSidebar({
   updateElementStyle,
   handleImageUpload,
   deleteElement,
-   toggleStyle
 }) {
   const [activeTab, setActiveTab] = useState("elements");
   const propertiesRef = useRef(null);
@@ -67,6 +69,16 @@ export default function EditorSidebar({
 
   // Element configurations with enhanced styling
   const elementTypes = [
+    {
+      type: "shape",
+      label: "Shape Block",
+      icon: Square, // Import Square from lucide-react
+      description: "Rectangle or Circle shapes",
+      color:
+        "bg-gradient-to-br from-cyan-50 to-cyan-100 hover:from-cyan-100 hover:to-cyan-200 border-cyan-300",
+      iconColor: "text-cyan-700",
+      shadowColor: "shadow-cyan-100",
+    },
     {
       type: "text",
       label: "Text Block",
@@ -456,9 +468,17 @@ export default function EditorSidebar({
             </div>
 
             <div
-              className="w-full max-w-full overflow-visible bg-gradient-to-br from-purple-50/50 to-indigo-50/50 rounded-lg p-4 border border-purple-200/50"
+              className="w-full max-w-full overflow-hidden bg-gradient-to-br from-purple-50/50 to-indigo-50/50 rounded-lg p-4 border border-purple-200/50"
               onClick={(e) => e.stopPropagation()}
             >
+              {selectedElement.type === "shape" && (
+                <ShapePropertiesPanel
+                  element={selectedElement}
+                  updateElement={updateElement}
+                  updateElementStyle={updateElementStyle}
+                  deleteElement={deleteElement}
+                />
+              )}
               {(selectedElement.type === "text" ||
                 selectedElement.type === "header") && (
                 <TextPropertiesPanel
@@ -467,7 +487,6 @@ export default function EditorSidebar({
                   updateElementStyle={updateElementStyle}
                   deleteElement={deleteElement}
                   handleImageUpload={handleImageUpload}
-                   toggleStyle={toggleStyle} // ✅ Pass the function
                 />
               )}
 

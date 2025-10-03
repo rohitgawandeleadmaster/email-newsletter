@@ -37,10 +37,61 @@ import {
   Link,
   Eraser,
   Wand2,
+  Shapes,
 } from "lucide-react";
 
 const isBrowser = () =>
   typeof window !== "undefined" && typeof document !== "undefined";
+
+// Build per-corner radius string if any corner is set; else return styles.borderRadius or fallback
+const composeCornerRadius = (styles, fallback = "0px") => {
+  const tl = styles?.borderTopLeftRadius;
+  const tr = styles?.borderTopRightRadius;
+  const br = styles?.borderBottomRightRadius;
+  const bl = styles?.borderBottomLeftRadius;
+
+  const anyCorner = tl || tr || br || bl;
+  if (anyCorner) {
+    return `${tl || "0px"} ${tr || "0px"} ${br || "0px"} ${bl || "0px"}`;
+  }
+  return styles?.borderRadius || fallback;
+};
+
+// Return the final radius to apply given shapeType and styles
+const getShapeBorderRadius = (shapeType, styles) => {
+  switch ((shapeType || "rectangle").toLowerCase()) {
+    case "circle":
+    case "oval":
+      return "50%";
+    case "rounded-rectangle":
+      return composeCornerRadius(styles, "12px");
+    case "rectangle":
+      return composeCornerRadius(styles, "0px");
+    // Polygon shapes won't visually show rounded corners due to clipping
+    case "trapezoid":
+    case "star":
+    default:
+      return "0px";
+  }
+};
+
+// Only use polygon clip-path for polygon shapes
+const getShapeClipPath = (shapeType) => {
+  switch ((shapeType || "rectangle").toLowerCase()) {
+    case "trapezoid":
+      return "polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)";
+    case "star":
+      return "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
+    default:
+      return "none";
+  }
+};
+
+// Guard to decide if a shape is polygonal
+const isPolygonShape = (shapeType) => {
+  const t = (shapeType || "rectangle").toLowerCase();
+  return t === "trapezoid" || t === "star";
+};
 
 export default function ImagePropertiesPanel({
   element,
@@ -89,6 +140,70 @@ export default function ImagePropertiesPanel({
     updateElement(element.id, { styles: updatedStyles });
   };
 
+  // ✅ Handle shape changes with proper corner radius logic
+  const handleShapeChange = (shapeType) => {
+    const updatedStyles = {
+      ...element.styles,
+      shapeType: shapeType,
+    };
+
+    // Apply shape-specific styles but preserve existing corner radius for compatible shapes
+    switch (shapeType) {
+      case "rectangle":
+        // Keep existing border radius for rectangles
+        updatedStyles.clipPath = "none";
+        break;
+      case "rounded-rectangle":
+        // Keep existing border radius or set default
+        if (
+          !updatedStyles.borderRadius &&
+          !updatedStyles.borderTopLeftRadius &&
+          !updatedStyles.borderTopRightRadius &&
+          !updatedStyles.borderBottomRightRadius &&
+          !updatedStyles.borderBottomLeftRadius
+        ) {
+          updatedStyles.borderRadius = "12px";
+        }
+        updatedStyles.clipPath = "none";
+        break;
+      case "circle":
+      case "oval":
+        // Force 50% for perfect circles
+        updatedStyles.borderRadius = "50%";
+        updatedStyles.clipPath = "none";
+        // Clear per-corner radius as they don't apply to circles
+        delete updatedStyles.borderTopLeftRadius;
+        delete updatedStyles.borderTopRightRadius;
+        delete updatedStyles.borderBottomRightRadius;
+        delete updatedStyles.borderBottomLeftRadius;
+        break;
+      case "trapezoid":
+        updatedStyles.borderRadius = "0px";
+        updatedStyles.clipPath = "polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%)";
+        // Clear per-corner radius as they don't apply to clipped shapes
+        delete updatedStyles.borderTopLeftRadius;
+        delete updatedStyles.borderTopRightRadius;
+        delete updatedStyles.borderBottomRightRadius;
+        delete updatedStyles.borderBottomLeftRadius;
+        break;
+      case "star":
+        updatedStyles.borderRadius = "0px";
+        updatedStyles.clipPath =
+          "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)";
+        // Clear per-corner radius as they don't apply to clipped shapes
+        delete updatedStyles.borderTopLeftRadius;
+        delete updatedStyles.borderTopRightRadius;
+        delete updatedStyles.borderBottomRightRadius;
+        delete updatedStyles.borderBottomLeftRadius;
+        break;
+      default:
+        updatedStyles.borderRadius = "0px";
+        updatedStyles.clipPath = "none";
+    }
+
+    updateElement(element.id, { styles: updatedStyles });
+  };
+
   // ✅ Update image URL
   const handleURLChange = (e) => {
     updateElement(element.id, { content: e.target.value });
@@ -101,6 +216,18 @@ export default function ImagePropertiesPanel({
     } else if (direction === "back") {
       handleStyleChange("zIndex", 1);
     }
+  };
+
+  // Helper to check if corner radius controls should be disabled
+  const isCornerRadiusDisabled = () => {
+    const shapeType = element.styles?.shapeType || "rectangle";
+    return ["circle", "oval", "trapezoid", "star"].includes(shapeType);
+  };
+
+  // Helper to get corner radius display value
+  const getCornerRadiusValue = () => {
+    if (isCornerRadiusDisabled()) return 0;
+    return parseInt(element.styles?.borderRadius) || 0;
   };
 
   return (
@@ -199,7 +326,55 @@ export default function ImagePropertiesPanel({
             </AccordionContent>
           </AccordionItem>
 
-          {/* Rest of the existing accordion items... */}
+          {/* Image Shape & Sizing Section */}
+          <AccordionItem value="shape" className="border-0">
+            <AccordionTrigger className="px-4 py-3 bg-indigo-50/50 hover:bg-indigo-50 border-b">
+              <div className="flex items-center gap-2">
+                <Shapes className="w-4 h-4 text-indigo-600" />
+                <span className="font-medium">Image Shape & Sizing</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <div className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Shape</Label>
+                  <Select
+                    value={element.styles?.shapeType || "rectangle"}
+                    onValueChange={handleShapeChange}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a shape" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rectangle">Rectangle</SelectItem>
+                      <SelectItem value="rounded-rectangle">
+                        Rounded Rectangle
+                      </SelectItem>
+                      <SelectItem value="circle">Circle</SelectItem>
+                      <SelectItem value="oval">Oval</SelectItem>
+                      <SelectItem value="trapezoid">Trapezoid</SelectItem>
+                      <SelectItem value="star">Star</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Shape Preview */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Preview</Label>
+                  <div
+                    className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-indigo-200 border mx-auto"
+                    style={{
+                      borderRadius: getShapeBorderRadius(
+                        element.styles?.shapeType,
+                        element.styles
+                      ),
+                      clipPath: getShapeClipPath(element.styles?.shapeType),
+                    }}
+                  />
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
 
           {/* Dimensions & Layout Section */}
           <AccordionItem value="layout" className="border-0">
@@ -375,20 +550,29 @@ export default function ImagePropertiesPanel({
 
                 {/* Border Radius */}
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Border Radius</Label>
+                  <Label className="text-sm font-medium">Corner Radius</Label>
                   <div className="flex gap-1 items-center">
                     <Input
                       type="number"
-                      value={parseInt(element.styles?.borderRadius) || 0}
+                      value={getCornerRadiusValue()}
                       onChange={(e) =>
                         handleStyleChange("borderRadius", `${e.target.value}px`)
                       }
                       className="text-sm"
+                      disabled={isCornerRadiusDisabled()}
                     />
                     <Badge variant="outline" className="text-xs">
                       px
                     </Badge>
                   </div>
+                  {isCornerRadiusDisabled() && (
+                    <p className="text-xs text-muted-foreground">
+                      {element.styles?.shapeType === "circle" ||
+                      element.styles?.shapeType === "oval"
+                        ? "Corner radius is automatically set to 50% for circular shapes"
+                        : "Corner radius doesn't apply to polygon shapes (trapezoid, star)"}
+                    </p>
+                  )}
                 </div>
 
                 {/* Opacity */}
