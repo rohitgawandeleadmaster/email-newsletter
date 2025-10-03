@@ -1713,7 +1713,7 @@ export default function EmailNewsletterEditor() {
               </div>
 
               {/* Share Button */}
-              {!shareDisabled && (
+              {/* {!shareDisabled && (
                 <button
                   onClick={async () => {
                     setIsSharing(true);
@@ -1733,7 +1733,28 @@ export default function EmailNewsletterEditor() {
                   <Share2 className="w-4 h-4" />
                   {isSharing ? "..." : "Share"}
                 </button>
-              )}
+              )} */}
+               {
+                <button
+                  onClick={async () => {
+                    setIsSharing(true);
+                    try {
+                      await copyShareLink();
+                    } finally {
+                      setIsSharing(false);
+                    }
+                  }}
+                  disabled={isSharing}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
+                    isSharing
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
+                  }`}
+                >
+                  <Share2 className="w-4 h-4" />
+                  {isSharing ? "..." : "Share"}
+                </button>
+              }
             </div>
           )}
 
