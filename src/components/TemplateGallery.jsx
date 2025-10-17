@@ -98,9 +98,9 @@ const templatesData = [
     category: "Automotive",
     color: "bg-gray-500",
     templates: [
-      { title: "New Car Launch (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/e5e7eb/6b7280?text=New+Car+Launch", link: "#" },
-      { title: "Promo Offer (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/d1d5db/6b7280?text=Promo+Offer", link: "#" },
-      { title: "Follow-up Post-Inquiry (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/9ca3af/6b7280?text=Inquiry+Followup", link: "#" },
+      { title: "New Car Launch (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/e5e7eb/6b7280?text=New+Car+Launch", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1760598625%2Fnewsletter_1760598630147" },
+      { title: "Promo Offer (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/d1d5db/6b7280?text=Promo+Offer", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1760673369%2Fnewsletter_1760673374693" },
+      { title: "Follow-up Post-Inquiry (Email)", type: "email", placeholderUrl: "https://placehold.co/400x300/9ca3af/6b7280?text=Inquiry+Followup", link: "https://email-newsletter-tan.vercel.app/?template=https%3A%2F%2Fres.cloudinary.com%2Fdhlex64es%2Fraw%2Fupload%2Fv1760689699%2Fnewsletter_1760689705874" },
       // { title: "Service Camp Alert (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/d1d5db/4338ca?text=Service+Camp", link: "#" },
       // { title: "Test Drive Reminder (WhatsApp)", type: "whatsapp", placeholderUrl: "https://placehold.co/400x300/e5e7eb/4338ca?text=Test+Drive+Reminder", link: "#" },
     ],
