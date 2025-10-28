@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import EditorSidebar from "./EditorSidebar";
 import EditorCanvas from "./EditorCanvas";
-import { MousePointer, Eye, Save, Send, Download, Share2 } from "lucide-react";
+import { MousePointer, Eye, Save, Send, Download, Share2, Edit2 } from "lucide-react";
 import domToImage from "dom-to-image-more";
 import jsPDF from "jspdf";
 import { exportToEmailHtml } from "./ExportToEmailHtml";
@@ -16,9 +16,101 @@ if (typeof window !== "undefined" && !window.LZString) {
   script.async = true;
   document.head.appendChild(script);
 }
-// Add your Cloudinary details here
+
+// ============================================================================
+// CONFIGURATION - Update these values for your backend
+// ============================================================================
+const API_BASE_URL = "http://localhost:3000/api/v1";
 const CLOUD_NAME = "dhlex64es";
 const UPLOAD_PRESET = "newsletter";
+
+// User/Work ID - Replace with your actual user authentication system
+// For now, using a dummy workId. In production, get this from your auth context
+const WORK_ID = "USER-12345";
+
+// ============================================================================
+// API SERVICE - All backend communication functions
+// ============================================================================
+const TemplateAPI = {
+  // Create a new template
+  async createTemplate(templateData) {
+    const response = await fetch(`${API_BASE_URL}/templates`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: templateData.name,
+        cloudinaryUrl: templateData.cloudinaryUrl,
+        workId: WORK_ID,
+        previewImageUrl: templateData.previewImageUrl || "",
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to create template");
+    }
+
+    return await response.json();
+  },
+
+  // Get all templates for current user
+  async getTemplatesByWorkId() {
+    const response = await fetch(`${API_BASE_URL}/templates/work/${WORK_ID}`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to fetch templates");
+    }
+
+    return await response.json();
+  },
+
+  // Get a single template by ID
+  async getTemplateById(templateId) {
+    const response = await fetch(`${API_BASE_URL}/templates/${templateId}`);
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to fetch template");
+    }
+
+    return await response.json();
+  },
+
+  // Update an existing template
+  async updateTemplate(templateId, updates) {
+    const response = await fetch(`${API_BASE_URL}/templates/${templateId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to update template");
+    }
+
+    return await response.json();
+  },
+
+  // Delete a template
+  async deleteTemplate(templateId) {
+    const response = await fetch(`${API_BASE_URL}/templates/${templateId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to delete template");
+    }
+
+    return await response.json();
+  },
+};
 
 // Social SVG icons for proper rendering in exports
 const SOCIAL_SVGS = {
@@ -94,7 +186,6 @@ const ensureFontsLoaded = async () => {
     const link = document.createElement("link");
     link.id = id;
     link.rel = "stylesheet";
-    // Include all font weights for proper export rendering
     link.href =
       "https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Poppins:wght@100;200;300;400;500;600;700;800;900&family=Roboto:wght@100;300;400;500;700;900&family=Open+Sans:wght@300;400;500;600;700;800&family=Lato:wght@100;300;400;700;900&family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap";
     document.head.appendChild(link);
@@ -149,7 +240,7 @@ const extractScale = (transform) => {
   return match ? parseFloat(match[1]) : 1;
 };
 
-// Build per-corner radius string if any corner is set; else return styles.borderRadius or fallback
+// Build per-corner radius string if any corner is set
 const composeCornerRadius = (styles, fallback = "0px") => {
   const tl = styles?.borderTopLeftRadius;
   const tr = styles?.borderTopRightRadius;
@@ -173,7 +264,6 @@ const getShapeBorderRadius = (shapeType, styles) => {
       return composeCornerRadius(styles, "12px");
     case "rectangle":
       return composeCornerRadius(styles, "0px");
-    // Polygon shapes won't visually show rounded corners due to clipping
     case "trapezoid":
     case "star":
     default:
@@ -199,7 +289,7 @@ const isPolygonShape = (shapeType) => {
   return t === "trapezoid" || t === "star";
 };
 
-// Helper to strip layout-affecting transforms (preserve image rotation)
+// Helper to strip layout-affecting transforms
 const stripLayoutTransforms = (node, preserveImageRotation = false) => {
   if (node && node.style) {
     if (!preserveImageRotation) {
@@ -222,7 +312,6 @@ const stripLayoutTransforms = (node, preserveImageRotation = false) => {
 const normalizeLayoutTransforms = (root) => {
   const walk = (node) => {
     if (node.tagName === "IMG") {
-      // Preserve image transforms for rotation
       stripLayoutTransforms(node, true);
     } else {
       stripLayoutTransforms(node, false);
@@ -267,44 +356,236 @@ export default function EmailNewsletterEditor() {
   const [message, setMessage] = useState("");
   const [shareDisabled, setShareDisabled] = useState(false);
   const [isSharedDataLoaded, setIsSharedDataLoaded] = useState(false);
+  
   // Loading states
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingPng, setIsExportingPng] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isExportingHtml, setIsExportingHtml] = useState(false);
+  
+  // Track if we're editing an existing template
+  const [currentTemplateId, setCurrentTemplateId] = useState(null);
+  
   const dragItem = useRef(null);
   const canvasRef = useRef(null);
 
-  // inside EmailNewsletterEditor.jsx, near other export helpers
-  const generateThumbnail = async () => {
+  // ============================================================================
+  // THUMBNAIL GENERATION
+  // ============================================================================
+ const generateThumbnail = async () => {
+  try {
+    await ensureFontsLoaded();
+    const node = prepareForExport();
+    if (!node) return "";
+
+    Object.assign(node.style, {
+      position: "absolute",
+      left: "-9999px",
+      top: "0",
+      zIndex: "-1",
+    });
+    document.body.appendChild(node);
+    await new Promise((r) => setTimeout(r, 800));
+
+    const captureWidth = 600;   // ✅ Only first 300px width
+    const captureHeight = 1000;  // ✅ Only first 300px height
+
+    const dataUrl = await domToImage.toPng(node, {
+      quality: 0.9,
+      bgcolor: globalSettings.newsletterColor || "#ffffff",
+      width: captureWidth,
+      height: captureHeight,
+      style: {
+        clip: `rect(0px, ${captureWidth}px, ${captureHeight}px, 0px)`,
+        overflow: 'hidden',
+      },
+      filter: (el) => !el?.dataset?.noExport,
+    });
+
+    document.body.removeChild(node);
+    return dataUrl;
+  } catch (error) {
+    console.error("Error generating thumbnail:", error);
+    return "";
+  }
+};
+
+
+  // ============================================================================
+  // TEMPLATE DATA UPLOAD TO CLOUDINARY (for share feature)
+  // ============================================================================
+  const saveToCloudinary = async (data) => {
     try {
-      await ensureFontsLoaded();
-      const node = prepareForExport(); // already in file
-      if (!node) return "";
-      Object.assign(node.style, {
-        position: "absolute",
-        left: "-9999px",
-        top: "0",
-        zIndex: "-1",
+      const blob = new Blob([JSON.stringify(data)], {
+        type: "application/json",
       });
-      document.body.appendChild(node);
-      await new Promise((r) => setTimeout(r, 800));
-      const width = Math.min(320, parseInt(globalSettings.maxWidth || 600, 10));
-      const scale =
-        width / (parseInt(globalSettings.maxWidth || 600, 10) || 600);
-      const dataUrl = await domToImage.toPng(node, {
-        quality: 0.8,
-        bgcolor: globalSettings.newsletterColor || "#ffffff",
-        width: parseInt(globalSettings.maxWidth || 600, 10),
-        height: node.scrollHeight,
-        style: { transform: `scale(${scale})`, transformOrigin: "top left" },
-        filter: (el) => !el?.dataset?.noExport,
-      });
-      document.body.removeChild(node);
-      return dataUrl;
-    } catch {
-      return "";
+      const formData = new FormData();
+      formData.append("file", blob);
+      formData.append("upload_preset", UPLOAD_PRESET);
+      formData.append("public_id", `newsletter_${Date.now()}`);
+      formData.append("resource_type", "raw");
+
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const uploaded = await res.json();
+      if (uploaded.secure_url) {
+        return uploaded.secure_url;
+      } else {
+        throw new Error("Upload failed");
+      }
+    } catch (err) {
+      console.error("Cloudinary save error:", err);
+      throw err;
+    }
+  };
+
+  // ============================================================================
+  // SAVE OR UPDATE TEMPLATE TO BACKEND DATABASE
+  // ============================================================================
+  const saveOrUpdateTemplate = async () => {
+    try {
+      setIsSaving(true);
+      
+      // Step 1: Generate thumbnail
+      showMessage("Generating thumbnail...");
+      const thumbnailDataUrl = await generateThumbnail();
+      
+      // Step 2: Upload thumbnail to Cloudinary (if generated)
+      let thumbnailCloudinaryUrl = "";
+      if (thumbnailDataUrl) {
+        showMessage("Uploading thumbnail...");
+        const blob = await fetch(thumbnailDataUrl).then(r => r.blob());
+        const formData = new FormData();
+        formData.append("file", blob);
+        formData.append("upload_preset", UPLOAD_PRESET);
+        
+        const thumbResponse = await fetch(
+          `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+        
+        const thumbData = await thumbResponse.json();
+        if (thumbData.secure_url) {
+          thumbnailCloudinaryUrl = thumbData.secure_url;
+        }
+      }
+
+      // Step 3: Upload template data to Cloudinary
+      showMessage("Uploading template data...");
+      const templateData = {
+        name: newsletterName || "Untitled",
+        elements,
+        globalSettings,
+        workId: WORK_ID,
+        createdAt: currentTemplateId ? undefined : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      
+      const cloudinaryUrl = await saveToCloudinary(templateData);
+
+      // Step 4: Check if we're updating or creating
+      let response;
+      if (currentTemplateId) {
+        // UPDATE existing template
+        showMessage("Updating template...");
+        const updates = {
+          name: newsletterName || "Untitled",
+          cloudinaryUrl: cloudinaryUrl,
+        };
+        
+        if (thumbnailCloudinaryUrl) {
+          updates.previewImageUrl = thumbnailCloudinaryUrl;
+        }
+        
+        response = await TemplateAPI.updateTemplate(currentTemplateId, updates);
+        showMessage("Template updated successfully!");
+      } else {
+        // CREATE new template
+        showMessage("Saving to database...");
+        response = await TemplateAPI.createTemplate({
+          name: newsletterName || "Untitled",
+          cloudinaryUrl: cloudinaryUrl,
+          previewImageUrl: thumbnailCloudinaryUrl,
+        });
+        
+        // Store the new template ID for future updates
+        if (response.data && response.data._id) {
+          setCurrentTemplateId(response.data._id);
+        }
+        
+        showMessage("Template saved successfully!");
+      }
+      
+      return response;
+    } catch (error) {
+      console.error("Error saving/updating template:", error);
+      showMessage(`Failed to save template: ${error.message}`);
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ============================================================================
+  // LOAD TEMPLATE FROM BACKEND
+  // ============================================================================
+  const loadTemplateFromBackend = async (templateId) => {
+    try {
+      showMessage("Loading template...");
+      const response = await TemplateAPI.getTemplateById(templateId);
+      
+      if (response.data) {
+        const template = response.data;
+        
+        // Fetch the actual template data from Cloudinary
+        const dataResponse = await fetch(template.cloudinaryUrl);
+        const templateData = await dataResponse.json();
+        
+        setElements(templateData.elements);
+        setGlobalSettings(templateData.globalSettings);
+        setNewsletterName(templateData.name || "Untitled Newsletter");
+        setSelectedElementId(null);
+        
+        // Store the template ID for updates
+        setCurrentTemplateId(template._id);
+        
+        showMessage("Template loaded successfully!");
+      }
+    } catch (error) {
+      console.error("Error loading template:", error);
+      showMessage(`Failed to load template: ${error.message}`);
+    }
+  };
+
+  // ============================================================================
+  // DELETE TEMPLATE FROM BACKEND
+  // ============================================================================
+  const deleteTemplateFromBackend = async (templateId) => {
+    try {
+      showMessage("Deleting template...");
+      const response = await TemplateAPI.deleteTemplate(templateId);
+      
+      if (response.message) {
+        showMessage(response.message);
+      } else {
+        showMessage("Template deleted successfully!");
+      }
+      
+      return response;
+    } catch (error) {
+      console.error("Error deleting template:", error);
+      showMessage(`Failed to delete template: ${error.message}`);
+      throw error;
     }
   };
 
@@ -312,8 +593,10 @@ export default function EmailNewsletterEditor() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const templateUrl = urlParams.get("template");
+    const templateId = urlParams.get("templateId");
 
     if (templateUrl) {
+      // Load from shared Cloudinary URL
       fetch(templateUrl)
         .then((res) => res.json())
         .then((data) => {
@@ -322,25 +605,37 @@ export default function EmailNewsletterEditor() {
           setNewsletterName(data.name || "Untitled Newsletter");
           setShareDisabled(true);
           setIsSharedDataLoaded(true);
+          // Don't set currentTemplateId for shared templates
+          setCurrentTemplateId(null);
           showMessage("Loaded from shared template!");
         })
         .catch((err) => {
           console.error("Error loading shared template:", err);
           showMessage("Failed to load shared template.");
         });
+    } else if (templateId) {
+      // Load from backend database
+      loadTemplateFromBackend(templateId);
     }
   }, []);
+
   const location = useLocation();
 
   useEffect(() => {
     const tpl = location?.state?.template;
-    const action = location?.state?.action; // "edit" | "send"
+    const action = location?.state?.action;
+    
     if (tpl && tpl.elements && tpl.globalSettings) {
       setElements(tpl.elements);
       setGlobalSettings(tpl.globalSettings);
       setNewsletterName(tpl.name || "Untitled Newsletter");
       setSelectedElementId(null);
-      // Optionally trigger send after render if requested
+      
+      // Store the template ID if available (for updates)
+      if (tpl._id) {
+        setCurrentTemplateId(tpl._id);
+      }
+      
       if (action === "send") {
         setTimeout(() => {
           try {
@@ -349,7 +644,6 @@ export default function EmailNewsletterEditor() {
               tpl.globalSettings,
               tpl.name || newsletterName
             );
-            // Replace clipboard with your actual send flow
             navigator.clipboard.writeText(html);
             showMessage("Email HTML ready to send (copied).");
           } catch (e) {
@@ -359,61 +653,10 @@ export default function EmailNewsletterEditor() {
       } else {
         showMessage("Template loaded.");
       }
-      // Clear state so back/forward doesn't re-trigger
+      
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, [location]);
-
-  // EmailNewsletterEditor.jsx (top-level helpers)
-  const LS_KEY = "newsletter_templates_v1";
-  const loadTemplates = () => {
-    try {
-      return JSON.parse(localStorage.getItem(LS_KEY)) || [];
-    } catch {
-      return [];
-    }
-  };
-  const saveTemplates = (list) => {
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(list));
-    } catch {}
-  };
-  const genId = () =>
-    "tpl_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-
-  // inside component
-  const saveTemplateToLocal = async () => {
-    try {
-      const thumb = await generateThumbnail(); // generate preview
-      const id = genId();
-      const record = {
-        id,
-        name: newsletterName || "Untitled",
-        elements,
-        globalSettings,
-        thumbnailUrl: thumb, // attach thumbnail here
-        updatedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-      };
-      const list = loadTemplates();
-      saveTemplates([record, ...list]);
-      showMessage("Template saved locally.");
-    } catch (e) {
-      showMessage("Failed to generate thumbnail, saved without preview.");
-      const id = genId();
-      const record = {
-        id,
-        name: newsletterName || "Untitled",
-        elements,
-        globalSettings,
-        thumbnailUrl: "",
-        updatedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-      };
-      const list = loadTemplates();
-      saveTemplates([record, ...list]);
-    }
-  };
 
   const showMessage = (text) => {
     setMessage(text);
@@ -637,37 +880,6 @@ export default function EmailNewsletterEditor() {
     updateElement(id, { styles: styleUpdates });
   };
 
-  const saveToCloudinary = async (data) => {
-    try {
-      const blob = new Blob([JSON.stringify(data)], {
-        type: "application/json",
-      });
-      const formData = new FormData();
-      formData.append("file", blob);
-      formData.append("upload_preset", UPLOAD_PRESET);
-      formData.append("public_id", `newsletter_${Date.now()}`); // unique file name
-      formData.append("resource_type", "raw");
-
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/raw/upload`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      const uploaded = await res.json();
-      if (uploaded.secure_url) {
-        return uploaded.secure_url; // URL of JSON file
-      } else {
-        throw new Error("Upload failed");
-      }
-    } catch (err) {
-      console.error("Cloudinary save error:", err);
-      throw err;
-    }
-  };
-
   const handleImageUpload = async (id, file) => {
     if (!file || !file.type.startsWith("image")) return;
 
@@ -826,7 +1038,6 @@ export default function EmailNewsletterEditor() {
       }
     });
 
-    // Normalize layout transforms but preserve image rotations
     normalizeLayoutTransforms(exportContainer);
 
     return exportContainer;
@@ -859,7 +1070,6 @@ export default function EmailNewsletterEditor() {
     const div = document.createElement("div");
     const styles = element.styles || {};
 
-    // Extract rotation for images
     const imageRotation = extractRotation(styles.transform || styles.rotate);
     const elementScale = extractScale(styles.transform || styles.scale);
 
@@ -884,12 +1094,10 @@ export default function EmailNewsletterEditor() {
         const shapeWidth = parseInt(styles?.width) || 200;
         const shapeHeight = parseInt(styles?.height) || 200;
 
-        // Shape-specific styling with fixed corner radius
         const isPoly = isPolygonShape(shapeType);
         const shapeRadius = getShapeBorderRadius(shapeType, styles);
         const shapeClip = getShapeClipPath(shapeType);
 
-        // Ensure the wrapper itself has pixel size and no transform for export
         div.style.width = `${shapeWidth}px`;
         div.style.height = `${shapeHeight}px`;
         div.style.background = "transparent";
@@ -897,7 +1105,6 @@ export default function EmailNewsletterEditor() {
         div.style.transform = "none";
         div.style.transformOrigin = "top left";
 
-        // Fill generator (export scope)
         const getFillStyle = () => {
           const fillType = styles?.fillType || "solid";
           switch (fillType) {
@@ -916,7 +1123,6 @@ export default function EmailNewsletterEditor() {
           }
         };
 
-        // Border generator (export scope)
         const getBorderStyles = (s) => {
           if (parseInt(s?.borderWidth) > 0) {
             return `${s.borderWidth} ${s.borderStyle || "solid"} ${
@@ -926,7 +1132,6 @@ export default function EmailNewsletterEditor() {
           return "none";
         };
 
-        // Container (kept simple for dom-to-image)
         const container = document.createElement("div");
         container.style.cssText = `
           position: relative;
@@ -939,7 +1144,6 @@ export default function EmailNewsletterEditor() {
           opacity: ${styles?.opacity || "1"};
         `;
 
-        // Shape div with proper shape support
         const shapeDiv = document.createElement("div");
 
         shapeDiv.style.cssText = `
@@ -1093,7 +1297,6 @@ export default function EmailNewsletterEditor() {
         stripLayoutTransforms(buttonLink);
         div.appendChild(buttonLink);
 
-        // Record clickable rect for PDF
         const pad = (val, fallback = "0px") =>
           parseFloat((val || fallback).toString());
         const padTop = pad(styles.paddingTop, "12px");
@@ -1279,7 +1482,6 @@ export default function EmailNewsletterEditor() {
           `;
           stripLayoutTransforms(iconsContainer);
 
-          // Calculate positioning for PDF link annotations
           const gapPx = parseFloat((styles.gap || "12px").toString());
           const iconSize = 24;
           const iconBox = 28;
@@ -1351,7 +1553,6 @@ export default function EmailNewsletterEditor() {
 
             iconsContainer.appendChild(link);
 
-            // Record clickable rect for PDF
             const x = baseLeft + offsetX + i * (iconBox + gapPx);
             const y =
               baseTop +
@@ -1400,6 +1601,7 @@ export default function EmailNewsletterEditor() {
     if (isExporting) return;
 
     setIsExporting(true);
+    setIsExportingPng(true);
     try {
       await ensureFontsLoaded();
 
@@ -1440,17 +1642,21 @@ export default function EmailNewsletterEditor() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      showMessage("PNG exported successfully!");
     } catch (error) {
       console.error("Error generating image:", error);
       showMessage("Failed to generate image. Please try again.");
     } finally {
       setIsExporting(false);
+      setIsExportingPng(false);
     }
   };
 
   const downloadAsPdf = async () => {
     if (isExporting) return;
     setIsExporting(true);
+    setIsExportingPdf(true);
     try {
       await ensureFontsLoaded();
 
@@ -1500,7 +1706,6 @@ export default function EmailNewsletterEditor() {
 
       pdf.addImage(dataUrl, "PNG", 0, 0, widthPx, heightPx, undefined, "FAST");
 
-      // Add link annotations
       exportLinkRects.forEach(({ href, x, y, width, height }) => {
         if (!href || href === "#") return;
         try {
@@ -1519,123 +1724,152 @@ export default function EmailNewsletterEditor() {
       showMessage("Failed to generate PDF. Please try again.");
     } finally {
       setIsExporting(false);
+      setIsExportingPdf(false);
     }
   };
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-white via-gray-50 to-white border-b-2 border-gray-300 px-6 py-4 flex items-center justify-between shadow-lg">
-        {/* Newsletter Name Input with Edit Button */}
-        <div className="flex-1 max-w-md relative group">
-          <input
-            type="text"
-            value={newsletterName}
-            onChange={(e) => setNewsletterName(e.target.value)}
-            className="text-xl font-bold bg-transparent border-none focus:outline-none text-gray-800 placeholder-gray-400 w-full pr-12 transition-all duration-300"
-            placeholder="Untitled Newsletter"
-          />
-          <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 w-0 group-focus-within:w-full transition-all duration-500 absolute bottom-0 left-0 rounded-full"></div>
-
-          {/* Edit Icon Button */}
-          <button
-            onClick={() =>
-              document
-                .querySelector('input[placeholder="Untitled Newsletter"]')
-                .focus()
-            }
-            className="absolute right-0 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-blue-500 transition-all duration-200 opacity-0 group-hover:opacity-100 hover:scale-110 rounded-full hover:bg-blue-50"
-            aria-label="Edit Newsletter Name"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M17.414 2.586a2 2 0 010 2.828l-9.9 9.9a1 1 0 01-.464.263l-4 1a1 1 0 01-1.213-1.213l1-4a1 1 0 01.263-.464l9.9-9.9a2 2 0 012.828 0zM15.121 4.05L14 2.93l-1.414 1.414 1.121 1.121 1.414-1.414zM13.707 5.464L12.586 4.343 3.414 13.515l-.707 2.828 2.828-.707 9.172-9.172z" />
-            </svg>
-          </button>
+<div className="px-6 py-8 bg-white flex items-center justify-between shadow-lg">
+        {/* Logo and Company Name */}
+          <div className="flex items-center gap-3 mr-8 ">
+          <div className="relative group/logo cursor-pointer">
+            {/* <div className="absolute inset-0 bg-gradient-to-r from-[#f51398] to-[#2001fd] rounded-xl blur-md opacity-60 group-hover/logo:opacity-90 transition-opacity duration-300"></div> */}
+            <div className="relative bg-gradient-to-br from-[#fbd3ec] to-[#dcd2ff] rounded-xl p-2.5 shadow-lg transform group-hover/logo:scale-110 transition-all duration-300 border border-[#f3c7ff]">
+              <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="url(#logo-gradient)" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <defs>
+                  <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#f51398" />
+                    <stop offset="50%" stopColor="#c40cd8" />
+                    <stop offset="100%" stopColor="#2001fd" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-2xl font-black bg-gradient-to-r from-[#f51398] via-[#c40cd8] to-[#2001fd] bg-clip-text text-transparent tracking-tight leading-none">
+              EMAIL<span className="text-[#2001fd] ml-2">Newsletter</span>
+            </h1>
+            <p className="text-x font-semibold bg-gradient-to-r from-[#ff22aa] to-[#2100ff] bg-clip-text text-transparent tracking-wider">EDITOR</p>
+          </div>
         </div>
+        {/* Newsletter Name Input */}
+      {activeView === "editor" && (
+  <div className="flex-1 max-w-md relative group ml-20 flex items-center gap-3">
+    <button
+      onClick={() =>
+        document
+          .querySelector('input[placeholder="Untitled Newsletter"]')
+          .focus()
+      }
+      className="p-2 text-gray-400 hover:text-blue-500 transition-all duration-200 hover:scale-110 rounded-full hover:bg-blue-50"
+      aria-label="Edit Newsletter Name"
+    >
+      <Edit2 className="w-5 h-5" />
+    </button>
+
+    <input
+      type="text"
+      value={newsletterName}
+      onChange={(e) => setNewsletterName(e.target.value)}
+      className="text-xl font-bold bg-transparent border-none focus:outline-none text-gray-800 placeholder-gray-400 w-full transition-all duration-300"
+      placeholder="Untitled Newsletter"
+    />
+  </div>
+)}
 
         {/* Navigation */}
-        <div className="flex items-center gap-4">
-          <header className="bg-gradient-to-r from-blue-50 to-indigo-50 shadow-md rounded-xl p-3 border border-blue-100">
-            <nav className="flex items-center gap-3">
-              <Link
-                to="/templates"
-                className="px-4 py-2.5 rounded-lg text-sm font-semibold bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                  />
-                </svg>
-                Templates
-              </Link>
-              <Link
-                to="/saved"
-                className="px-4 py-2.5 rounded-lg text-sm font-semibold bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
-                  />
-                </svg>
-                Saved Templates
-              </Link>
-            </nav>
-          </header>
+       <div
+  className="flex items-center gap-4"
+  style={{
+    marginLeft: activeView === "preview" ? "30px" : "0px"
+  }}
+>
+  <header className="">
+    <nav className="flex items-center gap-3">
 
-          {/* Save Template */}
-          <button
-            onClick={async () => {
-              setIsSaving(true);
-              try {
-                await saveTemplateToLocal();
-              } finally {
-                setIsSaving(false);
-              }
-            }}
-            disabled={isSaving}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-              isSaving
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600 text-white hover:from-indigo-600 hover:via-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transform hover:scale-105 ring-2 ring-indigo-200 hover:ring-indigo-300"
-            }`}
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-              />
-            </svg>
-            {isSaving ? "..." : "Save Template"}
-          </button>
-        </div>
+      {/* Templates Button */}
+      <Link
+        to="/templates"
+        className="px-8 py-3.5 rounded-2xl text-sm font-semibold 
+        text-white bg-gradient-to-r from-[#f51398] via-[#c40cd8] to-[#2001fd]
+        hover:from-[#d70f84] hover:via-[#ab0fc4] hover:to-[#2400db]
+        transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-2xl
+        transform hover:-translate-y-0.5 hover:scale-105 ring-2 ring-pink-200 hover:ring-blue-300"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+          />
+        </svg>
+        Templates
+      </Link>
+
+      {/* Saved Button */}
+      <Link
+        to="/saved"
+        className="px-8 py-3.5 rounded-2xl text-sm font-semibold 
+        text-white bg-gradient-to-r from-[#ff22aa] via-[#d602ff] to-[#2100ff]
+        hover:from-[#e01c9a] hover:via-[#b100e6] hover:to-[#1c00d4]
+        transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-2xl
+        transform hover:-translate-y-0.5 hover:scale-105 ring-2 ring-pink-200 hover:ring-purple-300"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
+          />
+        </svg>
+        Saved Templates
+      </Link>
+
+    </nav>
+  </header>
+
+  {/* Save/Update Template Button */}
+  <button
+    onClick={saveOrUpdateTemplate}
+    disabled={isSaving}
+    className={`
+      relative px-8 py-3.5 rounded-2xl mr-57 mx-5 text-sm font-bold
+      transition-all duration-300 flex items-center gap-3
+      overflow-hidden group
+      ${isSaving
+        ? "bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed"
+        : currentTemplateId
+        ? "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white hover:shadow-[0_0_30px_rgba(20,184,166,0.6)] hover:scale-105 active:scale-95"
+        : "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white hover:shadow-[0_0_30px_rgba(20,184,166,0.6)] hover:scale-105 active:scale-95"
+      }
+    `}
+  >
+    <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></span>
+    <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2.5}
+        d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+      />
+    </svg>
+    <span className="relative z-10">
+      {isSaving
+        ? "Saving..."
+        : currentTemplateId
+        ? "Update Template"
+        : "Save Template"
+      }
+    </span>
+  </button>
+
+</div>
 
         {/* Right Side Controls */}
         <div className="flex items-center gap-4">
@@ -1671,95 +1905,73 @@ export default function EmailNewsletterEditor() {
             <div className="flex items-center gap-3">
               {/* Export Buttons */}
               <div className="flex items-center bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-1.5 shadow-inner gap-1">
-                <button
-                  onClick={async () => {
-                    setIsExportingPdf(true);
-                    try {
-                      await downloadAsPdf();
-                    } finally {
-                      setIsExportingPdf(false);
-                    }
-                  }}
+                {/* <button
+                  onClick={downloadAsPdf}
                   disabled={isExportingPdf}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-                    isExportingPdf
-                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      : "bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-xl transform hover:scale-105"
-                  }`}
+                  className={`
+                    relative px-6 py-3 rounded-xl text-sm font-bold
+                    transition-all duration-300 flex items-center gap-2.5
+                    overflow-hidden group
+                    ${isExportingPdf
+                      ? "bg-gray-400 text-white cursor-not-allowed"
+                      : "bg-gradient-to-br from-red-500 to-rose-600 text-white hover:shadow-[0_8px_30px_rgba(239,68,68,0.5)] hover:scale-105 active:scale-95 border-2 border-red-400/50"
+                    }
+                  `}
                 >
-                  <Download className="w-4 h-4" />
-                  {isExportingPdf ? "..." : "PDF"}
-                </button>
+                  <span className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></span>
+                  <Download className="w-4 h-4 relative z-10" />
+                  <span className="relative z-10">{isExportingPdf ? "Exporting..." : "PDF"}</span>
+                </button> */}
 
                 <button
-                  onClick={async () => {
-                    setIsExportingPng(true);
-                    try {
-                      await downloadAsImage();
-                    } finally {
-                      setIsExportingPng(false);
-                    }
-                  }}
+                  onClick={downloadAsImage}
                   disabled={isExportingPng}
-                  className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-                    isExportingPng
-                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      : "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transform hover:scale-105"
-                  }`}
+                  className={`
+                    relative px-6 py-3 rounded-xl text-sm font-bold
+                    transition-all duration-300 flex items-center gap-2.5
+                    overflow-hidden group
+                    ${isExportingPng
+                      ? "bg-gray-400 text-white cursor-not-allowed"
+                      : "bg-gradient-to-br from-emerald-500 to-green-600 text-white hover:shadow-[0_8px_30px_rgba(16,185,129,0.5)] hover:scale-105 active:scale-95 border-2 border-emerald-400/50"
+                    }
+                  `}
                 >
-                  <Download className="w-4 h-4" />
-                  {isExportingPng ? "..." : "PNG"}
+                  <span className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></span>
+                  <Download className="w-4 h-4 relative z-10" />
+                  <span className="relative z-10">{isExportingPng ? "Exporting..." : "PNG"}</span>
                 </button>
               </div>
 
               {/* Share Button */}
-              {/* {!shareDisabled && (
-                <button
-                  onClick={async () => {
-                    setIsSharing(true);
-                    try {
-                      await copyShareLink();
-                    } finally {
-                      setIsSharing(false);
-                    }
-                  }}
-                  disabled={isSharing}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-                    isSharing
-                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      : "bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
-                  }`}
-                >
-                  <Share2 className="w-4 h-4" />
-                  {isSharing ? "..." : "Share"}
-                </button>
-              )} */}
-               {
-                <button
-                  onClick={async () => {
-                    setIsSharing(true);
-                    try {
-                      await copyShareLink();
-                    } finally {
-                      setIsSharing(false);
-                    }
-                  }}
-                  disabled={isSharing}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-                    isSharing
-                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      : "bg-gradient-to-r from-purple-500 via-purple-600 to-pink-500 text-white hover:from-purple-600 hover:via-purple-700 hover:to-pink-600 shadow-lg hover:shadow-xl transform hover:scale-110 ring-2 ring-purple-200 hover:ring-purple-300"
-                  }`}
-                >
-                  <Share2 className="w-4 h-4" />
-                  {isSharing ? "..." : "Share"}
-                </button>
-              }
+              <button
+                onClick={async () => {
+                  setIsSharing(true);
+                  try {
+                    await copyShareLink();
+                  } finally {
+                    setIsSharing(false);
+                  }
+                }}
+                disabled={isSharing}
+                className={`
+                  relative px-8 py-3.5 rounded-2xl text-sm font-bold
+                  transition-all duration-300 flex items-center gap-3
+                  overflow-hidden group
+                  ${isSharing
+                    ? "bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed"
+                    : "bg-gradient-to-r from-pink-500 via-rose-500 to-orange-500 text-white hover:shadow-[0_0_40px_rgba(244,63,94,0.7)] hover:scale-110 active:scale-95"
+                  }
+                `}
+              >
+                <span className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(255,255,255,0.3),transparent)] opacity-0 group-hover:opacity-100 transition-opacity duration-500"></span>
+                <Share2 className="w-5 h-5 relative z-10 group-hover:rotate-12 transition-transform duration-300" />
+                <span className="relative z-10">{isSharing ? "Sharing..." : "Share"}</span>
+              </button>
             </div>
           )}
 
-          {/* Export HTML Button */}
-          <button
+          {/* Export HTML Button - Commented Out */}
+          {/* <button
             onClick={async () => {
               setIsExportingHtml(true);
               try {
@@ -1769,22 +1981,25 @@ export default function EmailNewsletterEditor() {
                   newsletterName,
                 });
                 await navigator.clipboard.writeText(html);
-                alert(
-                  "Email HTML copied to clipboard. Paste into Gmail or EmailJS."
-                );
+                showMessage("Email HTML copied to clipboard!");
               } finally {
                 setIsExportingHtml(false);
               }
             }}
             disabled={isExportingHtml}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center gap-2 ${
-              isExportingHtml
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-yellow-400 via-yellow-500 to-orange-500 text-white hover:from-yellow-500 hover:via-yellow-600 hover:to-orange-600 shadow-lg hover:shadow-xl transform hover:scale-105 ring-2 ring-yellow-200 hover:ring-yellow-300"
-            }`}
+            className={`
+              relative px-8 py-3.5 rounded-2xl text-sm font-bold
+              transition-all duration-300 flex items-center gap-3
+              overflow-hidden group
+              ${isExportingHtml
+                ? "bg-gradient-to-r from-gray-400 to-gray-500 text-white cursor-not-allowed"
+                : "bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 text-white hover:shadow-[0_0_35px_rgba(251,191,36,0.6)] hover:scale-105 active:scale-95"
+              }
+            `}
           >
+            <span className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/10 to-white/0 translate-y-full group-hover:translate-y-0 transition-transform duration-500"></span>
             <svg
-              className="w-4 h-4"
+              className="w-5 h-5 relative z-10"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1792,12 +2007,12 @@ export default function EmailNewsletterEditor() {
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeWidth={2}
+                strokeWidth={2.5}
                 d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
               />
             </svg>
-            {isExportingHtml ? "..." : "Export HTML"}
-          </button>
+            <span className="relative z-10">{isExportingHtml ? "Exporting..." : "Export HTML"}</span>
+          </button> */}
         </div>
       </div>
 
@@ -1807,12 +2022,14 @@ export default function EmailNewsletterEditor() {
           Newsletter saved successfully!
         </div>
       )}
+      
       {/* Message */}
       {message && (
         <div className="fixed top-20 right-6 z-50 bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded shadow-lg">
           {message}
         </div>
       )}
+      
       {/* Main Editor */}
       <div className="flex flex-1 overflow-hidden">
         {activeView === "editor" && (
